@@ -17,7 +17,7 @@ class Config:
     OLLAMA_MODEL = os.getenv("OLLAMA_MODEL", "gemma3:4b")
 
     # Kaggle bridge
-    KAGGLE_BRIDGE_URL = os.getenv("KAGGLE_BRIDGE_URL", "https://a4f1e81a8b40b15f1a.gradio.live")
+    KAGGLE_BRIDGE_URL = os.getenv("KAGGLE_BRIDGE_URL", "https://cb2b9d4b8abf2d1eb6.gradio.live")
     KAGGLE_BRIDGE_USER = os.getenv("KAGGLE_BRIDGE_USER", "admin")
     KAGGLE_BRIDGE_PASSWORD = os.getenv("KAGGLE_BRIDGE_PASSWORD", "pass1234")
     KAGGLE_BRIDGE_API_NAME = os.getenv("KAGGLE_BRIDGE_API_NAME", "/process_image")
