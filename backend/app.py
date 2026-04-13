@@ -11,7 +11,7 @@ logger = get_logger("app")
 
 app = Flask(__name__)
 app.config.from_object(Config)
-CORS(app)
+CORS(app, resources={r"/api/*": {"origins": [app.config["ALLOWED_ORIGIN"]]}})
 
 os.makedirs(app.config["UPLOAD_FOLDER"], exist_ok=True)
 os.makedirs(app.config["TEMP_FOLDER"], exist_ok=True)
