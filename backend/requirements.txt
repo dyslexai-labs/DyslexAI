@@ -8,3 +8,4 @@ requests
 gradio_client
 pillow
 google-genai
+gunicorn
