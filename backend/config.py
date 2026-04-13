@@ -1,12 +1,20 @@
 import os
 from dotenv import load_dotenv
+from flask_cors import CORS
+import os
 
 load_dotenv()
 
 
 class Config:
+
+    ALLOWED_ORIGIN = os.getenv("ALLOWED_ORIGIN", "*")
+    CORS(app, resources={r"/api/*": {"origins": [ALLOWED_ORIGIN]}})
+
+
     SECRET_KEY = os.getenv("SECRET_KEY", "dev-secret-key")
-    PROCESSOR_BACKEND = os.getenv("PROCESSOR_BACKEND", "kaggle")  # mock | kaggle | ollama
+    PROCESSOR_BACKEND = os.getenv("PROCESSOR_BACKEND", "kaggle")  # mock | kaggle | ollama | api
+    LOG_LEVEL = os.getenv("LOG_LEVEL", "INFO")
     MAX_CONTENT_LENGTH = 10 * 1024 * 1024  # 10 MB
 
     UPLOAD_FOLDER = os.getenv("UPLOAD_FOLDER", "uploads")
@@ -21,3 +29,7 @@ class Config:
     KAGGLE_BRIDGE_USER = os.getenv("KAGGLE_BRIDGE_USER", "admin")
     KAGGLE_BRIDGE_PASSWORD = os.getenv("KAGGLE_BRIDGE_PASSWORD", "pass1234")
     KAGGLE_BRIDGE_API_NAME = os.getenv("KAGGLE_BRIDGE_API_NAME", "/process_image")
+
+    # Google / Gemma API
+    GEMINI_API_KEY = os.getenv("GEMINI_API_KEY", "")
+    GEMMA_MODEL_ID = os.getenv("GEMMA_MODEL_ID", "gemma-4-26b-a4b-it")
