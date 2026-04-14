@@ -3,7 +3,6 @@ import time
 from io import BytesIO
 
 from PIL import Image, ImageEnhance
-
 from google import genai
 
 from config import Config
@@ -32,7 +31,7 @@ class GemmaTwoPassProcessor:
         image = Image.open(image_path).convert("RGB")
         processed = self._prepare_image_for_fast_reading(image)
 
-        logger.info("Passo 1: leitura + classificação + linhas")
+        logger.info("Passo 1: leitura + classificação")
         analysis = self._analyze_image(processed)
 
         raw_text = (
@@ -41,10 +40,9 @@ class GemmaTwoPassProcessor:
             or ""
         )
         content_type = analysis.get("content_type", "expositivo")
-        original_lines = analysis.get("original_lines") or []
 
-        if not original_lines and raw_text:
-            original_lines = self._split_lines_fallback(raw_text)
+        # No modo otimizado, as linhas são geradas localmente
+        original_lines = self._split_lines_fallback(raw_text, max_chars=22) if raw_text else []
 
         logger.info("Tipo identificado: %s", content_type)
         logger.info("Chars extraídos: %s", len(raw_text))
@@ -57,7 +55,7 @@ class GemmaTwoPassProcessor:
         simplified_lines = simplified.get("simplified_lines") or []
 
         if not simplified_lines and simplified_text:
-            simplified_lines = self._split_lines_fallback(simplified_text)
+            simplified_lines = self._split_lines_fallback(simplified_text, max_chars=22)
 
         logger.info("Chars simplificados: %s", len(simplified_text))
         logger.info("Linhas simplificadas: %s", len(simplified_lines))
@@ -78,46 +76,45 @@ class GemmaTwoPassProcessor:
                 "elapsed_total": elapsed_total,
                 "adaptive_simplification": True,
                 "reading_support_target": "dyslexia",
+                "line_generation": "local_fallback",
             },
         }
 
     def _prepare_image_for_fast_reading(self, image: Image.Image) -> Image.Image:
         """
-        Reduz o custo da imagem mantendo boa legibilidade para OCR/reading.
+        Otimiza a imagem para reduzir latência sem perder demasiada legibilidade.
         Estratégia:
-        - RGB
-        - ligeiro aumento de contraste e nitidez
-        - resize para janela útil
-        - recompressão leve para imagem mais simples
+        - só reduz imagens grandes
+        - só aumenta imagens MESMO pequenas
+        - contraste e nitidez leves
+        - recompressão JPEG leve
         """
         width, height = image.size
         longest = max(width, height)
 
         logger.info("Imagem original | size=%sx%s", width, height)
 
-        # Heurística simples para equilibrar qualidade e latência
-        target_longest = 1300
-        min_longest = 1000
-
-        if longest > target_longest:
-            scale = target_longest / float(longest)
+        # Só reduzir imagens grandes
+        if longest > 1400:
+            scale = 1250 / float(longest)
             new_size = (max(1, int(width * scale)), max(1, int(height * scale)))
             image = image.resize(new_size, Image.LANCZOS)
             logger.info("Imagem reduzida | new_size=%s", image.size)
 
-        elif longest < min_longest:
-            scale = min_longest / float(longest)
+        # Só aumentar imagens mesmo pequenas
+        elif longest < 380:
+            scale = 700 / float(longest)
             new_size = (max(1, int(width * scale)), max(1, int(height * scale)))
             image = image.resize(new_size, Image.LANCZOS)
             logger.info("Imagem aumentada moderadamente | new_size=%s", image.size)
 
-        # Ajustes leves para texto
-        image = ImageEnhance.Contrast(image).enhance(1.35)
-        image = ImageEnhance.Sharpness(image).enhance(1.25)
+        # Ajustes leves
+        image = ImageEnhance.Contrast(image).enhance(1.18)
+        image = ImageEnhance.Sharpness(image).enhance(1.10)
 
-        # Recompressão leve para simplificar payload
+        # Recompressão leve
         buffer = BytesIO()
-        image.save(buffer, format="JPEG", quality=82, optimize=True)
+        image.save(buffer, format="JPEG", quality=76, optimize=True)
         buffer.seek(0)
         optimized = Image.open(buffer).convert("RGB")
 
@@ -126,33 +123,29 @@ class GemmaTwoPassProcessor:
 
     def _analyze_image(self, image: Image.Image) -> dict:
         prompt = """
-Lê o texto presente na imagem e responde apenas em JSON válido.
+Lê o texto da imagem e responde apenas em JSON válido.
 
 Tarefas:
-1. Transcreve fielmente o texto da imagem.
-2. Identifica o tipo de conteúdo:
+1. transcreve fielmente o texto;
+2. identifica o tipo de conteúdo:
    - expositivo
    - exercicio
    - matematico_cientifico
-3. Divide o texto em linhas curtas para leitura assistida.
 
 Regras:
-- Não simplifiques.
-- Não resumas.
-- Não inventes conteúdo.
-- Mantém a ordem do texto.
-- Mantém números, símbolos, percentagens e unidades.
-- Se alguma parte estiver ilegível, usa [ilegível].
-- Não uses markdown.
-- Não uses blocos de código.
-- As linhas devem ser curtas, naturais e fáceis de seguir.
-- Evita partir números, unidades ou expressões importantes.
+- não simplifiques;
+- não resumas;
+- não inventes conteúdo;
+- mantém a ordem do texto;
+- mantém números, símbolos, percentagens e unidades;
+- se alguma parte estiver ilegível, usa [ilegível];
+- não uses markdown;
+- não uses blocos de código.
 
 Formato:
 {
   "content_type": "expositivo|exercicio|matematico_cientifico",
-  "raw_extracted_text": "texto completo",
-  "original_lines": ["linha 1", "linha 2"]
+  "raw_extracted_text": "texto completo"
 }
 """.strip()
 
@@ -173,6 +166,9 @@ Formato:
         text = response.text or ""
 
         logger.info("Passo 1: resposta Gemini recebida em %.2fs", elapsed)
+        if elapsed > 25:
+            logger.warning("Passo 1 lento: %.2fs", elapsed)
+
         logger.debug("Resposta análise (início): %s", text[:800])
 
         parsed = self._safe_json_parse(text, stage="analysis")
@@ -181,46 +177,36 @@ Formato:
     def _simplify_text_for_dyslexia(self, text: str, content_type: str) -> dict:
         if content_type == "exercicio":
             task_instructions = """
-Reescreve este enunciado em português europeu para apoio à leitura de uma pessoa com dislexia.
-
-Objetivo:
-- tornar o enunciado mais claro e mais fácil de seguir
-- manter exatamente o que é pedido
+Reescreve este enunciado em português europeu para apoiar a leitura de uma pessoa com dislexia.
 
 Regras:
 - não resolvas o exercício
+- torna o pedido mais claro
 - separa os dados importantes do que é pedido
 - usa frases curtas
-- torna as instruções mais claras
 - mantém números, valores, unidades e condições
 - não acrescentes informação nova
 - não elimines informação importante
-- divide o texto em linhas curtas para leitura assistida
-"""
+- divide o texto em linhas curtas
+""".strip()
+
         elif content_type == "matematico_cientifico":
             task_instructions = """
-Reescreve este conteúdo em português europeu para apoio à leitura de uma pessoa com dislexia.
-
-Objetivo:
-- tornar o conteúdo mais claro e mais fácil de interpretar
-- manter o rigor técnico
+Reescreve este conteúdo em português europeu para apoiar a leitura de uma pessoa com dislexia.
 
 Regras:
 - mantém números, símbolos, fórmulas, unidades e relações
 - não alteres dados
-- explica com frases curtas e claras
-- organiza a informação de forma mais legível
-- se houver um problema, separa dados e objetivo
-- não resolvas o exercício, exceto se isso for explicitamente pedido
-- divide o texto em linhas curtas para leitura assistida
-"""
+- usa frases curtas e claras
+- organiza melhor a informação
+- se houver problema, separa dados e objetivo
+- não resolvas o exercício, a menos que isso seja pedido
+- divide o texto em linhas curtas
+""".strip()
+
         else:
             task_instructions = """
-Reescreve o texto em português europeu para apoio à leitura de uma pessoa com dislexia.
-
-Objetivo:
-- tornar o texto mais claro, mais direto e mais fácil de ler
-- manter toda a informação importante
+Reescreve o texto em português europeu para apoiar a leitura de uma pessoa com dislexia.
 
 Regras:
 - usa frases curtas
@@ -229,8 +215,8 @@ Regras:
 - mantém a ordem das ideias
 - não acrescentes informação nova
 - não elimines informação importante
-- divide o texto em linhas curtas para leitura assistida
-"""
+- divide o texto em linhas curtas
+""".strip()
 
         prompt = f"""
 {task_instructions}
@@ -260,13 +246,16 @@ Formato:
         response = self.client.models.generate_content(
             model=self.model_id,
             contents=[prompt],
-            config={"temperature": 0.2}
+            config={"temperature": 0.1}
         )
 
         elapsed = time.time() - start
         response_text = response.text or ""
 
         logger.info("Passo 2: resposta Gemini recebida em %.2fs", elapsed)
+        if elapsed > 25:
+            logger.warning("Passo 2 lento: %.2fs", elapsed)
+
         logger.debug("Resposta simplificação (início): %s", response_text[:800])
 
         parsed = self._safe_json_parse(response_text, stage="simplify")
@@ -302,7 +291,6 @@ Formato:
             return {
                 "content_type": "expositivo",
                 "raw_extracted_text": cleaned,
-                "original_lines": [],
             }
 
         return {
@@ -310,10 +298,10 @@ Formato:
             "simplified_lines": [],
         }
 
-    def _split_lines_fallback(self, text: str, max_chars: int = 28) -> list[str]:
+    def _split_lines_fallback(self, text: str, max_chars: int = 22) -> list[str]:
         """
-        Fallback simples quando o modelo não devolve linhas.
-        Mantém unidades de sentido curtas sem partir brutalmente o texto.
+        Gera linhas curtas localmente para leitura assistida.
+        Mantém linhas curtas e relativamente naturais.
         """
         words = text.split()
         if not words:
