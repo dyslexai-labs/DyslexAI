@@ -316,8 +316,7 @@
 
 <script setup>
 import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue'
-
-const API_BASE_URL = 'http://127.0.0.1:5000'
+import { API_BASE_URL } from "./config";
 
 const screen = ref('upload')
 const previewUrl = ref('')

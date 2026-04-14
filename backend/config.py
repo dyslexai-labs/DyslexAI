@@ -1,17 +1,14 @@
 import os
 from dotenv import load_dotenv
-from flask_cors import CORS
-import os
 
 load_dotenv()
 
 
 class Config:
-
     ALLOWED_ORIGIN = os.getenv("ALLOWED_ORIGIN", "*")
 
     SECRET_KEY = os.getenv("SECRET_KEY", "dev-secret-key")
-    PROCESSOR_BACKEND = os.getenv("PROCESSOR_BACKEND", "kaggle")  # mock | kaggle | ollama | api
+    PROCESSOR_BACKEND = os.getenv("PROCESSOR_BACKEND", "kaggle")  # mock | kaggle | ollama | api | api_advanced
     LOG_LEVEL = os.getenv("LOG_LEVEL", "INFO")
     MAX_CONTENT_LENGTH = 10 * 1024 * 1024  # 10 MB
 

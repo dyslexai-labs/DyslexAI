@@ -1,8 +1,10 @@
 from config import Config
 from services.gemma_api_processor import GemmaAPIProcessor
+from services.gemma_advanced_processor import GemmaAdvancedProcessor
 from services.kaggle_processor import KaggleProcessor
 from services.mock_processor import MockProcessor
 from services.ollama_processor import OllamaProcessor
+from services.gemma_two_pass_processor import GemmaTwoPassProcessor
 from services.logger_utils import get_logger
 
 logger = get_logger("processor_factory")
@@ -48,6 +50,27 @@ def get_processor():
             "SIM" if Config.GEMINI_API_KEY else "NAO",
         )
         return GemmaAPIProcessor(
+            api_key=Config.GEMINI_API_KEY,
+            model_id=Config.GEMMA_MODEL_ID,
+        )
+
+    if backend in {"api_advanced", "gemma_advanced", "gemma_api_advanced", "advanced"}:
+        logger.info(
+            "A devolver GemmaAdvancedProcessor | model_id=%s | api_key_definida=%s",
+            Config.GEMMA_MODEL_ID,
+            "SIM" if Config.GEMINI_API_KEY else "NAO",
+        )
+        return GemmaAdvancedProcessor(
+            api_key=Config.GEMINI_API_KEY,
+            model_id=Config.GEMMA_MODEL_ID,
+        )
+    if backend in {"api_two_pass", "two_pass", "gemma_two_pass"}:
+        logger.info(
+            "A devolver GemmaTwoPassProcessor | model_id=%s | api_key_definida=%s",
+            Config.GEMMA_MODEL_ID,
+            "SIM" if Config.GEMINI_API_KEY else "NAO",
+        )
+        return GemmaTwoPassProcessor(
             api_key=Config.GEMINI_API_KEY,
             model_id=Config.GEMMA_MODEL_ID,
         )
