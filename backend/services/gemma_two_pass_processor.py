@@ -6,7 +6,7 @@ from google import genai
 
 from config import Config
 from services.logger_utils import get_logger
-from services.pipeline_utils import preprocess_for_reading
+from services.pipeline_adaptive_utils import preprocess_for_reading
 
 
 logger = get_logger("gemma_two_pass_processor")
