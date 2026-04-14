@@ -19,44 +19,59 @@ class GemmaTwoPassProcessor:
         self.model_id = model_id or Config.GEMMA_MODEL_ID
 
         logger.info("Inicializar GemmaTwoPassProcessor")
-        logger.info(f"Modelo: {self.model_id}")
-        logger.info(f"API key definida: {'SIM' if self.api_key else 'NAO'}")
+        logger.info("Modelo: %s", self.model_id)
+        logger.info("API key definida: %s", "SIM" if self.api_key else "NAO")
 
         self.client = genai.Client(api_key=self.api_key)
 
-    # =========================
-    # ENTRY POINT
-    # =========================
     def process_image(self, image_path):
         start_total = time.time()
 
-        logger.info(f"Início processamento: {image_path}")
+        logger.info("Início processamento: %s", image_path)
 
         image = Image.open(image_path).convert("RGB")
-
         processed = preprocess_for_reading(image)
 
-        # PASSO 1
         logger.info("Passo 1: leitura + classificação + linhas")
         analysis = self._analyze_image(processed)
 
-        raw_text = analysis.get("raw_extracted_text", "")
+        raw_text = (
+            analysis.get("original_text")
+            or analysis.get("raw_extracted_text")
+            or ""
+        )
         content_type = analysis.get("content_type", "expositivo")
-        original_lines = analysis.get("original_lines", [])
+        original_lines = analysis.get("original_lines") or []
 
-        logger.info(f"Tipo identificado: {content_type}")
-        logger.info(f"Chars extraídos: {len(raw_text)}")
+        if not original_lines and raw_text:
+            original_lines = [
+                line.strip()
+                for line in raw_text.splitlines()
+                if line.strip()
+            ]
 
-        # PASSO 2
+        logger.info("Tipo identificado: %s", content_type)
+        logger.info("Chars extraídos: %s", len(raw_text))
+        logger.info("Linhas originais: %s", len(original_lines))
+
         logger.info("Passo 2: simplificação adaptativa")
         simplified = self._simplify_text(raw_text, content_type)
 
-        simplified_text = simplified.get("simplified_text", "")
-        simplified_lines = simplified.get("simplified_lines", [])
+        simplified_text = simplified.get("simplified_text", "") or ""
+        simplified_lines = simplified.get("simplified_lines") or []
+
+        if not simplified_lines and simplified_text:
+            simplified_lines = [
+                line.strip()
+                for line in simplified_text.splitlines()
+                if line.strip()
+            ]
+
+        logger.info("Chars simplificados: %s", len(simplified_text))
+        logger.info("Linhas simplificadas: %s", len(simplified_lines))
 
         elapsed_total = time.time() - start_total
-
-        logger.info(f"Processamento concluído em {elapsed_total:.2f}s")
+        logger.info("Processamento concluído em %.2fs", elapsed_total)
 
         return {
             "success": True,
@@ -68,15 +83,11 @@ class GemmaTwoPassProcessor:
                 "provider": "gemma_two_pass",
                 "model_id": self.model_id,
                 "content_type": content_type,
-                "elapsed_total": elapsed_total
-            }
+                "elapsed_total": elapsed_total,
+            },
         }
 
-    # =========================
-    # PASSO 1
-    # =========================
     def _analyze_image(self, image):
-
         prompt = """
 Analisa a imagem e responde apenas em JSON válido.
 
@@ -112,21 +123,15 @@ Formato:
         )
 
         elapsed = time.time() - start
-
         text = response.text or ""
 
-        logger.info(f"Resposta análise recebida em {elapsed:.2f}s")
-        logger.debug(f"Resposta (inicio): {text[:500]}")
+        logger.info("Resposta análise recebida em %.2fs", elapsed)
+        logger.debug("Resposta análise (início): %s", text[:500])
 
-        parsed = self._safe_json_parse(text)
-
+        parsed = self._safe_json_parse(text, stage="analysis")
         return parsed
 
-    # =========================
-    # PASSO 2
-    # =========================
     def _simplify_text(self, text, content_type):
-
         base_prompt = f"""
 Tens de simplificar o texto para leitura acessível em português europeu.
 
@@ -149,7 +154,6 @@ Regras:
 - Clarifica o que é pedido.
 - Separa instruções.
 """
-
         elif content_type == "matematico_cientifico":
             base_prompt += """
 Regras:
@@ -157,7 +161,6 @@ Regras:
 - Explica de forma simples.
 - Não alteres dados.
 """
-
         else:
             base_prompt += """
 Regras:
@@ -175,37 +178,49 @@ Regras:
         )
 
         elapsed = time.time() - start
-
         text = response.text or ""
 
-        logger.info(f"Simplificação concluída em {elapsed:.2f}s")
-        logger.debug(f"Simplificado (inicio): {text[:500]}")
+        logger.info("Simplificação concluída em %.2fs", elapsed)
+        logger.debug("Resposta simplificação (início): %s", text[:500])
 
-        parsed = self._safe_json_parse(text)
-
+        parsed = self._safe_json_parse(text, stage="simplify")
         return parsed
 
-    # =========================
-    # JSON SAFE
-    # =========================
-    def _safe_json_parse(self, text):
+    def _safe_json_parse(self, text, stage="unknown"):
+        cleaned = (text or "").strip()
+
+        if cleaned.startswith("```json"):
+            cleaned = cleaned[len("```json"):].strip()
+        elif cleaned.startswith("```"):
+            cleaned = cleaned[len("```"):].strip()
+
+        if cleaned.endswith("```"):
+            cleaned = cleaned[:-3].strip()
 
         try:
-            parsed = json.loads(text)
+            parsed = json.loads(cleaned)
 
             if isinstance(parsed, list):
                 if parsed and isinstance(parsed[0], dict):
+                    logger.info("JSON parsed com sucesso (%s) a partir de lista", stage)
                     return parsed[0]
 
             if isinstance(parsed, dict):
+                logger.info("JSON parsed com sucesso (%s)", stage)
                 return parsed
 
-        except Exception:
-            logger.warning("Falha ao fazer parse JSON, fallback")
+        except Exception as e:
+            logger.warning("Falha ao fazer parse JSON (%s): %s", stage, e)
+            logger.debug("Texto bruto (%s): %s", stage, cleaned[:1000])
+
+        if stage == "analysis":
+            return {
+                "content_type": "expositivo",
+                "raw_extracted_text": cleaned,
+                "original_lines": [],
+            }
 
         return {
-            "raw_extracted_text": text,
-            "simplified_text": text,
-            "original_lines": [],
-            "simplified_lines": []
+            "simplified_text": cleaned,
+            "simplified_lines": [],
         }
