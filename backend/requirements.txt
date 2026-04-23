@@ -9,3 +9,4 @@ gradio_client
 pillow
 google-genai
 gunicorn
+modal

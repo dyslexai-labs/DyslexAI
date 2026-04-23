@@ -24,7 +24,11 @@ class Config:
     KAGGLE_BRIDGE_USER = os.getenv("KAGGLE_BRIDGE_USER", "admin")
     KAGGLE_BRIDGE_PASSWORD = os.getenv("KAGGLE_BRIDGE_PASSWORD", "pass1234")
     KAGGLE_BRIDGE_API_NAME = os.getenv("KAGGLE_BRIDGE_API_NAME", "/process_image")
+    KAGGLE_BRIDGE_AUDIO_API_NAME = os.getenv("KAGGLE_BRIDGE_AUDIO_API_NAME", "/process_audio")
 
     # Google / Gemma API
-    GEMINI_API_KEY = os.getenv("GEMINI_API_KEY", "")
-    GEMMA_MODEL_ID = os.getenv("GEMMA_MODEL_ID", "gemma-4-26b-a4b-it")
+    GOOGLE_API_KEY = os.getenv("GOOGLE_API_KEY", os.getenv("GEMINI_API_KEY", ""))
+    GEMINI_API_KEY = GOOGLE_API_KEY
+    GEMMA_MODEL_ID = os.getenv("GEMMA_MODEL_ID", os.getenv("GOOGLE_IMAGE_MODEL_ID", "gemma-4-26b-a4b-it"))
+    GOOGLE_IMAGE_MODEL_ID = GEMMA_MODEL_ID
+    GOOGLE_AUDIO_MODEL_ID = os.getenv("GOOGLE_AUDIO_MODEL_ID", "gemini-2.5-flash")

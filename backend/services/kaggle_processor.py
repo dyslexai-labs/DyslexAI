@@ -15,11 +15,13 @@ class KaggleProcessor(BaseProcessor):
         username: str = "",
         password: str = "",
         api_name: str = "/process_image",
+        audio_api_name: str = "/process_audio",
     ):
         self.bridge_url = bridge_url
         self.username = username or ""
         self.password = password or ""
         self.api_name = api_name
+        self.audio_api_name = audio_api_name
 
         if not self.bridge_url:
             raise ValueError("KAGGLE_BRIDGE_URL não está configurado.")
@@ -33,20 +35,21 @@ class KaggleProcessor(BaseProcessor):
             client_kwargs["auth"] = (self.username, self.password)
 
         logger.info(
-            "Inicializar KaggleProcessor | bridge_url=%s | api_name=%s | auth=%s",
+            "Inicializar KaggleProcessor | bridge_url=%s | api_name=%s | audio_api_name=%s | auth=%s",
             self.bridge_url,
             self.api_name,
+            self.audio_api_name,
             "SIM" if self.username else "NAO",
         )
         self.client = Client(**client_kwargs)
 
-    def process_image(self, image_path: str):
-        logger.info("A enviar pedido para bridge Kaggle | image_path=%s", image_path)
+    def _submit_file_job(self, file_path: str, api_name: str):
+        logger.info("A enviar pedido para bridge Kaggle | file_path=%s | api_name=%s", file_path, api_name)
         start = time.time()
 
         job = self.client.submit(
-            handle_file(image_path),
-            api_name=self.api_name
+            handle_file(file_path),
+            api_name=api_name
         )
 
         while not job.done():
@@ -71,6 +74,10 @@ class KaggleProcessor(BaseProcessor):
             logger.error("Resposta inesperada do Kaggle bridge: %s", type(result))
             raise ValueError(f"Resposta inesperada do Kaggle bridge: {type(result)}")
 
+        return result
+
+    def process_image(self, image_path: str):
+        result = self._submit_file_job(image_path, self.api_name)
         normalized = {
             "success": bool(result.get("success", True)),
             "original_text": result.get("original_text", ""),
@@ -86,11 +93,36 @@ class KaggleProcessor(BaseProcessor):
             "bridge_url": self.bridge_url,
             "api_name": self.api_name,
         })
+        return normalized
 
+    def process_audio(self, audio_path: str):
+        result = self._submit_file_job(audio_path, self.audio_api_name)
+
+        transcription = result.get("transcription", "")
+        clean_text = result.get("clean_text", transcription)
+        words = result.get("words", []) or []
+        lines = [clean_text] if clean_text else []
+
+        normalized = {
+            "success": bool(result.get("success", True)),
+            "transcription": transcription,
+            "clean_text": clean_text,
+            "words": words,
+            "language": result.get("language", ""),
+            "spoken_text": clean_text,
+            "spoken_lines": lines,
+            "meta": result.get("meta", {"provider": "kaggle", "mode": "audio"}),
+        }
+        normalized.setdefault("meta", {})
+        normalized["meta"].setdefault("debug", {})
+        normalized["meta"]["debug"].update({
+            "processor": self.__class__.__name__,
+            "bridge_url": self.bridge_url,
+            "api_name": self.audio_api_name,
+        })
         logger.info(
-            "Resultado Kaggle normalizado | success=%s | original_lines=%s | simplified_lines=%s",
+            "Resultado áudio Kaggle normalizado | success=%s | words=%s",
             normalized.get("success"),
-            len(normalized.get("original_lines", []) or []),
-            len(normalized.get("simplified_lines", []) or []),
+            len(normalized.get("words", []) or []),
         )
         return normalized

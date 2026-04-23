@@ -41,6 +41,7 @@ def get_processor():
             username=Config.KAGGLE_BRIDGE_USER,
             password=Config.KAGGLE_BRIDGE_PASSWORD,
             api_name=Config.KAGGLE_BRIDGE_API_NAME,
+            audio_api_name=Config.KAGGLE_BRIDGE_AUDIO_API_NAME,
         )
 
     if backend in {"api", "gemma_api", "google_api"}:
@@ -52,6 +53,7 @@ def get_processor():
         return GemmaAPIProcessor(
             api_key=Config.GEMINI_API_KEY,
             model_id=Config.GEMMA_MODEL_ID,
+            audio_model_id=Config.GOOGLE_AUDIO_MODEL_ID,
         )
 
     if backend in {"api_advanced", "gemma_advanced", "gemma_api_advanced", "advanced"}:

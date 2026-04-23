@@ -34,3 +34,22 @@ dist/
 # Misc
 *.swp
 *.swo
+
+
+# modelos locais
+*.litertlm
+
+# ambiente local
+.env
+.env.local
+android/local.properties
+
+# dependências e builds
+node_modules/
+dist/
+android/.gradle/
+android/gradle/
+android/app/build/
+
+#zip
+*.zip

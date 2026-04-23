@@ -1,0 +1,7 @@
+<?xml version='1.0' encoding='utf-8'?>
+<resources>
+    <string name="app_name">DyslexAI</string>
+    <string name="title_activity_main">DyslexAI</string>
+    <string name="package_name">om.dyslexai.app</string>
+    <string name="custom_url_scheme">om.dyslexai.app</string>
+</resources>
