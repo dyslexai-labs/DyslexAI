@@ -6,53 +6,61 @@ export function createMobileInferenceProvider() {
       return DyslexAIPlugin.health()
     },
 
+    async getCapabilities() {
+      return DyslexAIPlugin.getCapabilities()
+    },
+
     async processText(text) {
       return DyslexAIPlugin.processText({ text })
     },
 
-    async processImage(file) {
-      const payload = await buildImagePayload(file)
-      return DyslexAIPlugin.processImage(payload)
+    async processImage(payload) {
+      if (!payload?.imageBase64) {
+        throw new Error('Imagem vazia ou não preparada.')
+      }
+
+      return DyslexAIPlugin.processImage({
+        imageBase64: payload.imageBase64,
+        mimeType: payload.mimeType || 'image/jpeg',
+      })
     },
 
-    async processAudio(_file) {
-      throw new Error('processAudio local ainda não implementado.')
+    async generateReadingPhrase(options = {}) {
+      return DyslexAIPlugin.generateReadingPhrase({
+        ageGroup: options.ageGroup || '8-10',
+        level: options.level || '1',
+        type: options.type || 'simple_sentence',
+      })
     },
 
-    async getCapabilities() {
-      return DyslexAIPlugin.getCapabilities()
+    async processAudio(file, expectedText = '') {
+      const audioBase64 = await fileToDataUrl(file)
+
+      return DyslexAIPlugin.processAudio({
+        audioBase64,
+        mimeType: file?.type || 'audio/webm',
+        expectedText,
+      })
+    },
+
+    async speak({ text, rate = 1.0 } = {}) {
+      return DyslexAIPlugin.speak({
+        text,
+        rate,
+      })
+    },
+
+    async stopSpeaking() {
+      return DyslexAIPlugin.stopSpeaking()
     },
   }
 }
 
-async function buildImagePayload(file) {
-  if (!file) {
-    throw new Error('Nenhuma imagem selecionada.')
-  }
-
-  const arrayBuffer = await file.arrayBuffer()
-  const base64 = arrayBufferToBase64(arrayBuffer)
-
-  if (!base64) {
-    throw new Error('Não foi possível converter a imagem selecionada.')
-  }
-
-  return {
-    imageBase64: base64,
-    mimeType: file.type || 'image/jpeg',
-    filename: file.name || 'page.jpg',
-  }
-}
-
-function arrayBufferToBase64(buffer) {
-  const bytes = new Uint8Array(buffer)
-  const chunkSize = 0x8000
-  let binary = ''
-
-  for (let i = 0; i < bytes.length; i += chunkSize) {
-    const chunk = bytes.subarray(i, i + chunkSize)
-    binary += String.fromCharCode(...chunk)
-  }
-
-  return btoa(binary)
+function fileToDataUrl(file) {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader()
+    reader.onload = () => resolve(reader.result)
+    reader.onerror = () => reject(reader.error)
+    reader.readAsDataURL(file)
+  })
 }

@@ -35,8 +35,6 @@ public class Gemma4Runtime implements LocalModelRuntime {
         }
 
         Log.i(TAG, "Inferência chamada com prompt: " + prompt);
-
-        // Simulação ainda (próximo passo é ligar motor real)
         return "Resposta simulada (Gemma futuro): " + prompt;
     }
 
@@ -48,6 +46,16 @@ public class Gemma4Runtime implements LocalModelRuntime {
 
         Log.i(TAG, "Inferência de imagem chamada.");
         return "Extração de imagem simulada (Gemma futuro)";
+    }
+
+    @Override
+    public String inferAudio(byte[] audioBytes, String mimeType, String prompt) throws Exception {
+        if (!initialized) {
+            throw new IllegalStateException("Runtime ainda não inicializado.");
+        }
+
+        Log.i(TAG, "Inferência de áudio chamada.");
+        return "{\"transcription\":\"\",\"clean_text\":\"\",\"words\":[],\"issues\":[],\"language\":\"pt-PT\"}";
     }
 
     @Override

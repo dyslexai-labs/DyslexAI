@@ -35,6 +35,43 @@
         </div>
       </section>
 
+      <section v-else-if="screen === 'select-image-source'" class="screen-center">
+        <div class="player-card mode-card">
+          <div class="player-top intro-top">
+            <div class="brand-inline">
+              <div class="brand">DyslexAI</div>
+              <div class="subtitle">Leitura assistida</div>
+            </div>
+            <div class="intro-copy">
+              <h1>Escolhe a origem da imagem</h1>
+              <p>
+                Podes tirar uma fotografia agora ou escolher uma imagem já existente da galeria.
+              </p>
+            </div>
+          </div>
+
+          <div class="player-bottom mode-grid-wrap">
+            <div class="mode-grid">
+              <button class="mode-option" @click="takePhoto">
+                <span class="mode-icon">📷</span>
+                <strong>Tirar fotografia</strong>
+                <span>Usar a câmara para fotografar a página ou exercício.</span>
+              </button>
+
+              <button class="mode-option" @click="pickFromGallery">
+                <span class="mode-icon">🖼️</span>
+                <strong>Escolher da galeria</strong>
+                <span>Selecionar uma imagem já guardada no dispositivo.</span>
+              </button>
+            </div>
+
+            <div style="margin-top: 16px; text-align: center;">
+              <button class="soft-action subtle-btn" @click="goHome">Voltar</button>
+            </div>
+          </div>
+        </div>
+      </section>
+
       <section v-else-if="screen === 'confirm-image'" class="screen-center">
         <div class="player-card">
           <div class="player-top preview-top">
@@ -49,7 +86,7 @@
 
             <div class="confirm-actions">
               <button class="main-action" @click="processImage">Processar</button>
-              <button class="soft-action" @click="triggerImageInput">Outra imagem</button>
+              <button class="soft-action" @click="startImageFlow">Outra imagem</button>
               <button class="soft-action subtle-btn" @click="goHome">Voltar</button>
             </div>
           </div>
@@ -70,6 +107,55 @@
                     : 'Clica em Gravar para captar a fala do aluno e preparar a leitura guiada.' }}
               </p>
 
+              <div class="audio-exercise-config">
+                <label>Idade
+                  <select v-model="readingAgeGroup">
+                    <option value="6-7">6-7</option>
+                    <option value="8-10">8-10</option>
+                    <option value="11-13">11-13</option>
+                  </select>
+                </label>
+                <label>Nível
+                  <select v-model="readingLevel">
+                    <option value="1">1</option>
+                    <option value="2">2</option>
+                    <option value="3">3</option>
+                  </select>
+                </label>
+                <label>Tipo
+                  <select v-model="readingType">
+                    <option value="simple_sentence">Frase simples</option>
+                    <option value="rhyme">Lengalenga</option>
+                    <option value="tongue_twister">Trava-línguas</option>
+                  </select>
+                </label>
+                <button
+                  class="soft-action"
+                  @click="generateReadingPhrase"
+                  :disabled="isGeneratingPhrase || isRecording || isRecorderBusy"
+                >
+                  {{ isGeneratingPhrase ? 'A gerar frase...' : 'Gerar frase' }}
+                </button>
+                <button
+                  v-if="expectedReadingText"
+                  class="soft-action"
+                  @click="generateReadingPhrase"
+                  :disabled="isGeneratingPhrase || isRecording || isRecorderBusy"
+                >
+                  Nova frase
+                </button>
+              </div>
+
+              <div v-if="isGeneratingPhrase" class="expected-reading-box">
+                <span class="speech-label">Preparação</span>
+                <strong>A gerar frase...</strong>
+              </div>
+
+              <div v-if="expectedReadingText" class="expected-reading-box">
+                <span class="speech-label">Frase a ler</span>
+                <strong>{{ expectedReadingText }}</strong>
+              </div>
+
               <div class="recording-status-row">
                 <span class="status-pill" :class="{ live: isRecording, ready: hasRecordedAudio && !isRecording }">
                   {{ isRecording ? 'A gravar' : (hasRecordedAudio ? 'Gravação pronta' : 'À espera de gravação') }}
@@ -88,10 +174,16 @@
             </div>
 
             <div class="record-controls">
-              <button class="main-action" @click="startRecording" :disabled="isRecording || isRecorderBusy">Gravar</button>
+              <button
+                class="main-action"
+                @click="startRecording"
+                :disabled="isRecording || isRecorderBusy || !expectedReadingText || isGeneratingPhrase"
+              >
+                {{ isRecording ? 'A gravar...' : 'Gravar' }}
+              </button>
               <button class="soft-action" @click="stopRecording" :disabled="!isRecording">Parar</button>
               <button class="soft-action" @click="clearRecordedAudio" :disabled="isRecording || !hasRecordedAudio">Limpar</button>
-              <button class="soft-action" @click="processAudio" :disabled="isRecording || !hasRecordedAudio">Processar</button>
+              <button class="soft-action" @click="processAudio" :disabled="isRecording || !hasRecordedAudio || !expectedReadingText">Processar</button>
               <button class="soft-action subtle-btn" @click="goHome">Voltar</button>
             </div>
           </div>
@@ -161,6 +253,21 @@
           </div>
 
           <div class="player-bottom reader-bottom">
+            <div v-if="expectedReadingText" class="speech-summary-box">
+              <span class="speech-label">Frase esperada</span>
+              <strong>{{ expectedReadingText }}</strong>
+            </div>
+
+            <div v-if="audioIssues.length" class="speech-summary-box issues-box">
+              <span class="speech-label">Dificuldades encontradas</span>
+              <ul class="issues-list">
+                <li v-for="(issue, index) in audioIssues" :key="`${issue.type || 'issue'}-${index}`">
+                  <strong>{{ issue.type || 'other' }}</strong> — {{ issue.message || 'Diferença identificada.' }}
+                  <span v-if="issue.expected || issue.heard"> ({{ issue.expected || '—' }} / {{ issue.heard || issue.fragment || '—' }})</span>
+                </li>
+              </ul>
+            </div>
+
             <div v-if="hasSpokenText" class="speech-summary-box">
               <span class="speech-label">Frase transcrita</span>
               <strong>{{ spokenText }}</strong>
@@ -268,6 +375,7 @@
 
 <script setup>
 import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue'
+import { Camera, CameraResultType, CameraSource } from '@capacitor/camera'
 import { createInferenceService } from './services/inference/createInferenceService'
 
 const inference = createInferenceService()
@@ -289,8 +397,16 @@ const screen = ref('home')
 const previewUrl = ref('')
 const audioPreviewUrl = ref('')
 const selectedFile = ref(null)
+const selectedImageBase64 = ref('')
+const selectedImageMimeType = ref('image/jpeg')
 const selectedAudioFile = ref(null)
 const selectedAudioName = ref('')
+const expectedReadingText = ref('')
+const readingAgeGroup = ref('8-10')
+const readingLevel = ref('1')
+const readingType = ref('simple_sentence')
+const audioIssues = ref([])
+const isGeneratingPhrase = ref(false)
 const isRecording = ref(false)
 const isRecorderBusy = ref(false)
 
@@ -383,7 +499,12 @@ watch(readingMode, () => {
 })
 watch(wordAudioMode, () => stopAllAudio())
 watch(currentTextMode, () => {
-  if (currentTextMode.value === 'spoken' && !hasSpokenText.value) currentTextMode.value = 'simplified'
+  if (currentTextMode.value === 'spoken' && !hasSpokenText.value) {
+    currentTextMode.value = simplifiedLines.value.length ? 'simplified' : 'original'
+  }
+  if (currentTextMode.value === 'simplified' && !simplifiedLines.value.length && originalLines.value.length) {
+    currentTextMode.value = 'original'
+  }
 })
 
 function updateLayoutFlags() {
@@ -392,13 +513,83 @@ function updateLayoutFlags() {
 
 function startImageFlow() {
   activeFlow.value = 'image'
-  triggerImageInput()
+  selectedFile.value = null
+  selectedImageBase64.value = ''
+  selectedImageMimeType.value = 'image/jpeg'
+  if (previewUrl.value) URL.revokeObjectURL(previewUrl.value)
+  previewUrl.value = ''
+  screen.value = 'select-image-source'
 }
 
-function startAudioFlow() {
+function setSelectedImageFromDataUrl(dataUrl, mimeType = 'image/jpeg') {
+  selectedImageBase64.value = dataUrl
+  selectedImageMimeType.value = mimeType || 'image/jpeg'
+
+  if (previewUrl.value) URL.revokeObjectURL(previewUrl.value)
+  previewUrl.value = dataUrl
+
+  selectedFile.value = { name: 'imagem-selecionada', type: selectedImageMimeType.value }
+  screen.value = 'confirm-image'
+}
+
+async function takePhoto() {
+  try {
+    const image = await Camera.getPhoto({
+      quality: 75,
+      width: 1000,
+      resultType: CameraResultType.DataUrl,
+      source: CameraSource.Camera,
+      allowEditing: false,
+    })
+
+    if (!image.dataUrl) throw new Error('A fotografia não devolveu dados.')
+
+    const mimeType = `image/${image.format || 'jpeg'}`
+    setSelectedImageFromDataUrl(image.dataUrl, mimeType)
+  } catch (error) {
+    console.error('[DyslexAI] Erro ao tirar fotografia:', error)
+    if (error?.message !== 'User cancelled photos app') {
+      alert('Não foi possível tirar fotografia.')
+    }
+  }
+}
+
+async function pickFromGallery() {
+  try {
+    const image = await Camera.getPhoto({
+      quality: 75,
+      width: 1000,
+      resultType: CameraResultType.DataUrl,
+      source: CameraSource.Photos,
+      allowEditing: false,
+    })
+
+    if (!image.dataUrl) throw new Error('A imagem não devolveu dados.')
+
+    const mimeType = `image/${image.format || 'jpeg'}`
+    setSelectedImageFromDataUrl(image.dataUrl, mimeType)
+  } catch (error) {
+    console.error('[DyslexAI] Erro ao escolher imagem:', error)
+    if (error?.message !== 'User cancelled photos app') {
+      alert('Não foi possível escolher imagem.')
+    }
+  }
+}
+
+async function startAudioFlow() {
   activeFlow.value = 'audio'
   clearRecordedAudio()
+  audioIssues.value = []
+  spokenText.value = ''
+  spokenTranscription.value = ''
+  expectedReadingText.value = ''
   screen.value = 'confirm-audio'
+
+  try {
+    await generateReadingPhrase()
+  } catch (error) {
+    console.error('[DyslexAI] Erro ao preparar leitura por voz:', error)
+  }
 }
 
 function triggerImageInput() {
@@ -411,6 +602,12 @@ function triggerAudioInput() {
 
 async function startRecording() {
   if (isRecording.value || isRecorderBusy.value) return
+
+  if (!expectedReadingText.value) {
+    alert('Gera primeiro uma frase para o aluno ler.')
+    return
+  }
+
   if (!(navigator.mediaDevices && window.MediaRecorder)) {
     alert('A gravação de áudio não é suportada neste navegador.')
     return
@@ -487,34 +684,72 @@ function clearRecordedAudio() {
   isRecording.value = false
   isRecorderBusy.value = false
   recordedChunks = []
+  audioIssues.value = []
+}
+
+async function generateReadingPhrase() {
+  try {
+    isGeneratingPhrase.value = true
+    expectedReadingText.value = ''
+    clearRecordedAudio()
+    audioIssues.value = []
+    spokenText.value = ''
+    spokenTranscription.value = ''
+
+    console.log('[DyslexAI] A gerar frase...', {
+      ageGroup: readingAgeGroup.value,
+      level: readingLevel.value,
+      type: readingType.value,
+    })
+
+    const result = await inference.generateReadingPhrase({
+      ageGroup: readingAgeGroup.value,
+      level: readingLevel.value,
+      type: readingType.value,
+    })
+
+    console.log('[DyslexAI] Resultado da geração de frase:', result)
+
+    expectedReadingText.value = (result?.text || '').trim()
+
+    if (!expectedReadingText.value) {
+      throw new Error('Não foi possível gerar a frase.')
+    }
+  } catch (error) {
+    console.error('[DyslexAI] Erro ao gerar frase:', error)
+    alert(error?.message || 'Erro ao gerar frase.')
+  } finally {
+    isGeneratingPhrase.value = false
+  }
+}
+
+function readFileAsDataUrl(file) {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader()
+    reader.onload = () => resolve(reader.result)
+    reader.onerror = () => reject(reader.error)
+    reader.readAsDataURL(file)
+  })
 }
 
 async function onImageChange(event) {
-  const sourceFile = event.target.files?.[0]
-  if (!sourceFile) return
+  const file = event.target.files?.[0]
+  if (!file) return
 
   try {
-    const buffer = await sourceFile.arrayBuffer()
+    selectedFile.value = file
+    selectedImageMimeType.value = file.type || 'image/jpeg'
 
-    const safeFile = new File(
-      [buffer],
-      sourceFile.name || 'page.jpg',
-      {
-        type: sourceFile.type || 'image/jpeg',
-        lastModified: Date.now(),
-      }
-    )
-
-    selectedFile.value = safeFile
-
-    if (previewUrl.value) URL.revokeObjectURL(previewUrl.value)
-    previewUrl.value = URL.createObjectURL(safeFile)
-
-    event.target.value = ''
-    screen.value = 'confirm-image'
+    const dataUrl = await readFileAsDataUrl(file)
+    setSelectedImageFromDataUrl(dataUrl, selectedImageMimeType.value)
   } catch (error) {
-    console.error('Erro ao preparar imagem:', error)
-    alert('Não foi possível abrir a imagem selecionada.')
+    console.error('[DyslexAI] Erro ao ler imagem selecionada:', error)
+    alert('Não foi possível ler a imagem selecionada.')
+    selectedFile.value = null
+    selectedImageBase64.value = ''
+    previewUrl.value = ''
+  } finally {
+    event.target.value = ''
   }
 }
 
@@ -528,8 +763,15 @@ function onAudioChange(event) {
   screen.value = 'confirm-audio'
 }
 
-async function processRealImage(file) {
-  const data = await inference.processImage(file)
+async function processRealImage() {
+  if (!selectedImageBase64.value) {
+    throw new Error('Não existe imagem preparada.')
+  }
+
+  const data = await inference.processImage({
+    imageBase64: selectedImageBase64.value,
+    mimeType: selectedImageMimeType.value,
+  })
 
   correctedText.value = data.original_text || ''
   simplifiedText.value = data.simplified_text || ''
@@ -538,26 +780,23 @@ async function processRealImage(file) {
 }
 
 async function processRealAudio(file) {
-  const data = await inference.processAudio(file)
+  const data = await inference.processAudio(file, expectedReadingText.value)
 
   spokenTranscription.value = data.transcription || ''
   spokenText.value = data.clean_text || data.spoken_text || data.transcription || ''
   spokenLines.value = Array.isArray(data.spoken_lines) && data.spoken_lines.length
     ? data.spoken_lines
     : (spokenText.value ? [spokenText.value] : [])
+  audioIssues.value = Array.isArray(data.issues) ? data.issues : []
 
-  if (!correctedText.value) {
-    correctedText.value = spokenText.value
-    originalLines.value = [...spokenLines.value]
-  }
-  if (!simplifiedText.value) {
-    simplifiedText.value = spokenText.value
-    simplifiedLines.value = [...spokenLines.value]
-  }
+  correctedText.value = expectedReadingText.value || spokenText.value
+  originalLines.value = correctedText.value ? [correctedText.value] : []
+  simplifiedText.value = spokenText.value
+  simplifiedLines.value = [...spokenLines.value]
 }
 
 async function processImage() {
-  if (!selectedFile.value) {
+  if (!selectedImageBase64.value) {
     alert('Nenhuma imagem selecionada.')
     return
   }
@@ -566,11 +805,11 @@ async function processImage() {
     screen.value = 'processing'
     processingTitle.value = 'A preparar a leitura'
     processingProgress.value = 15
-    processingMessage.value = 'A preparar a imagem...'
+    processingMessage.value = 'A enviar imagem...'
     await new Promise(resolve => setTimeout(resolve, 180))
     processingProgress.value = 45
-    processingMessage.value = 'A extrair e simplificar o texto...'
-    await processRealImage(selectedFile.value)
+    processingMessage.value = 'A processar texto...'
+    await processRealImage()
     processingProgress.value = 100
     processingMessage.value = 'Concluído.'
     enterReader('simplified')
@@ -584,6 +823,10 @@ async function processImage() {
 async function processAudio() {
   if (!selectedAudioFile.value) {
     alert('Ainda não existe uma gravação pronta.')
+    return
+  }
+  if (!expectedReadingText.value) {
+    alert('Gera primeiro a frase que o aluno deve ler.')
     return
   }
 
@@ -606,9 +849,26 @@ async function processAudio() {
   }
 }
 
-function enterReader(defaultTextMode = 'original') {
+function resolveAvailableTextMode(mode = 'simplified') {
+  if (mode === 'spoken') {
+    if (hasSpokenText.value) return 'spoken'
+    return simplifiedLines.value.length ? 'simplified' : 'original'
+  }
+
+  if (mode === 'simplified') {
+    return simplifiedLines.value.length ? 'simplified' : 'original'
+  }
+
+  if (mode === 'original') {
+    return originalLines.value.length ? 'original' : (simplifiedLines.value.length ? 'simplified' : 'original')
+  }
+
+  return simplifiedLines.value.length ? 'simplified' : 'original'
+}
+
+function enterReader(defaultTextMode = 'simplified') {
   stopAllAudio()
-  currentTextMode.value = defaultTextMode
+  currentTextMode.value = resolveAvailableTextMode(defaultTextMode)
   readingMode.value = 'line'
   linePlaybackMode.value = 'single'
   currentLineIndex.value = 0
@@ -623,7 +883,7 @@ function goHome() {
 }
 
 function switchTextMode(mode) {
-  currentTextMode.value = mode
+  currentTextMode.value = resolveAvailableTextMode(mode)
   currentLineIndex.value = 0
   currentWordIndex.value = 0
   stopAllAudio()
@@ -667,6 +927,7 @@ function restartReading() {
 }
 
 function getPortugueseVoice() {
+  if (!('speechSynthesis' in window)) return null
   const voices = window.speechSynthesis.getVoices()
   return voices.find(v => v.lang === 'pt-PT') || voices.find(v => v.lang?.toLowerCase().startsWith('pt')) || voices[0] || null
 }
@@ -686,6 +947,50 @@ function buildUtterance(text) {
   return utterance
 }
 
+function canUseBrowserTts() {
+  return 'speechSynthesis' in window && typeof SpeechSynthesisUtterance !== 'undefined'
+}
+
+function stopNativeTts() {
+  if (typeof inference.stopSpeaking === 'function') {
+    inference.stopSpeaking().catch(() => {})
+  }
+}
+
+function speakWithBrowserTts(text) {
+  return new Promise(resolve => {
+    if (!canUseBrowserTts()) {
+      resolve(false)
+      return
+    }
+
+    window.speechSynthesis.cancel()
+    const utterance = buildUtterance(text)
+    utterance.onend = () => resolve(true)
+    utterance.onerror = () => resolve(false)
+    window.speechSynthesis.speak(utterance)
+  })
+}
+
+async function speakTextAndWait(text) {
+  const cleanText = String(text || '').trim()
+  if (!cleanText) return false
+
+  if (typeof inference.speak === 'function') {
+    try {
+      await inference.speak({
+        text: cleanText,
+        rate: Number(speechRate.value),
+      })
+      return true
+    } catch (error) {
+      console.warn('[DyslexAI] TTS nativo falhou; a tentar fallback Web Speech.', error)
+    }
+  }
+
+  return speakWithBrowserTts(cleanText)
+}
+
 function stopWordPlay() {
   wordPlaybackStopped = true
   if (playTimer) {
@@ -693,12 +998,14 @@ function stopWordPlay() {
     playTimer = null
   }
   isPlayingWords.value = false
-  if ('speechSynthesis' in window) window.speechSynthesis.cancel()
+  stopNativeTts()
+  if (canUseBrowserTts()) window.speechSynthesis.cancel()
 }
 
 function stopAllAudio() {
   stopWordPlay()
-  if ('speechSynthesis' in window) window.speechSynthesis.cancel()
+  stopNativeTts()
+  if (canUseBrowserTts()) window.speechSynthesis.cancel()
   isSpeakingLine.value = false
 }
 
@@ -711,47 +1018,38 @@ function toggleLineReading() {
   speakCurrentLine()
 }
 
-function speakCurrentLine() {
-  if (!('speechSynthesis' in window)) return
+async function speakCurrentLine() {
   const text = currentLines.value[currentLineIndex.value] || ''
   if (!text) {
     isSpeakingLine.value = false
     return
   }
-  window.speechSynthesis.cancel()
-  const utterance = buildUtterance(text)
-  utterance.onend = () => {
-    if (readingMode.value === 'line' && linePlaybackMode.value === 'continuous' && isSpeakingLine.value) {
-      const isLastLine = currentLineIndex.value >= currentLines.value.length - 1
-      if (!isLastLine) {
-        currentLineIndex.value += 1
-        setTimeout(() => { if (isSpeakingLine.value) speakCurrentLine() }, 120)
-        return
-      }
+
+  await speakTextAndWait(text)
+
+  if (readingMode.value === 'line' && linePlaybackMode.value === 'continuous' && isSpeakingLine.value) {
+    const isLastLine = currentLineIndex.value >= currentLines.value.length - 1
+    if (!isLastLine) {
+      currentLineIndex.value += 1
+      setTimeout(() => { if (isSpeakingLine.value) speakCurrentLine() }, 120)
+      return
     }
-    isSpeakingLine.value = false
   }
-  utterance.onerror = () => { isSpeakingLine.value = false }
-  window.speechSynthesis.speak(utterance)
+
+  isSpeakingLine.value = false
 }
 
 function buildReadableWord(word) {
-  const cleaned = (word || '').trim()
-  return cleaned || ''
+  return String(word || '').replace(/[“”"«».,;:!?()\[\]]+/g, '').trim()
 }
 
-function speakCurrentWordAndWait() {
-  return new Promise(resolve => {
-    if (!('speechSynthesis' in window)) return resolve()
-    const word = buildReadableWord(currentWords.value[currentWordIndex.value] || '')
-    if (!word) return resolve()
-    window.speechSynthesis.cancel()
-    isSpeakingLine.value = true
-    const utterance = buildUtterance(word)
-    utterance.onend = () => { isSpeakingLine.value = false; resolve() }
-    utterance.onerror = () => { isSpeakingLine.value = false; resolve() }
-    window.speechSynthesis.speak(utterance)
-  })
+async function speakCurrentWordAndWait() {
+  const word = buildReadableWord(currentWords.value[currentWordIndex.value] || '')
+  if (!word) return
+
+  isSpeakingLine.value = true
+  await speakTextAndWait(word)
+  isSpeakingLine.value = false
 }
 
 function toggleWordPlay() {
@@ -811,6 +1109,8 @@ function onFullscreenChange() {
 function clearPreviewUrls() {
   if (previewUrl.value) URL.revokeObjectURL(previewUrl.value)
   previewUrl.value = ''
+  selectedImageBase64.value = ''
+  selectedImageMimeType.value = 'image/jpeg'
   clearRecordedAudio()
 }
 
@@ -820,6 +1120,8 @@ function resetAll() {
   screen.value = 'home'
   activeFlow.value = 'image'
   selectedFile.value = null
+  selectedImageBase64.value = ''
+  selectedImageMimeType.value = 'image/jpeg'
   clearRecordedAudio()
   isRecording.value = false
   isRecorderBusy.value = false

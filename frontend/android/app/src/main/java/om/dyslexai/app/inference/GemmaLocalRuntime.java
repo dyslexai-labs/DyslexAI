@@ -55,7 +55,7 @@ public class GemmaLocalRuntime implements LocalModelRuntime {
 
         String response = LiteRtBridge.runText(engine, prompt);
 
-        Log.i(TAG, "Resposta de texto recebida.");
+        Log.i(TAG, "Resposta de texto recebida:\n" + response);
         return response;
     }
 
@@ -66,15 +66,29 @@ public class GemmaLocalRuntime implements LocalModelRuntime {
         }
 
         File imageFile = persistTempImage(imageBytes, mimeType);
-
         Log.i(TAG, "A inferir imagem localmente: " + imageFile.getAbsolutePath());
         Log.i(TAG, "MimeType da imagem: " + mimeType);
+        Log.i(TAG, "Tamanho da imagem em bytes: " + imageBytes.length);
         Log.i(TAG, "Prompt de imagem enviada:\n" + prompt);
 
         String response = LiteRtBridge.runImage(engine, imageFile.getAbsolutePath(), prompt);
 
-        Log.i(TAG, "Resposta da imagem recebida.");
+        Log.i(TAG, "Resposta da imagem recebida:\n" + response);
         return response;
+    }
+
+    @Override
+    public String inferAudio(byte[] audioBytes, String mimeType, String prompt) throws Exception {
+        if (!initialized) {
+            throw new IllegalStateException("Runtime ainda não inicializado.");
+        }
+
+        Log.i(TAG, "inferAudio() chamado.");
+        Log.i(TAG, "MimeType do áudio: " + mimeType);
+        Log.i(TAG, "Tamanho do áudio em bytes: " + (audioBytes == null ? 0 : audioBytes.length));
+        Log.i(TAG, "Prompt de áudio enviada:\n" + prompt);
+
+        throw new UnsupportedOperationException("Áudio ainda não ligado ao LiteRtBridge nesta etapa.");
     }
 
     @Override
@@ -82,18 +96,25 @@ public class GemmaLocalRuntime implements LocalModelRuntime {
         return "gemma3-270m-local";
     }
 
-    private File persistTempImage(byte[] imageBytes, String mimeType) throws IOException {
-        if (cacheDirPath == null) {
-            throw new IOException("Diretoria de cache indisponível.");
-        }
-
-        File output = new File(cacheDirPath, "dyslexai-image-" + UUID.randomUUID() + guessExtension(mimeType));
-        try (FileOutputStream fos = new FileOutputStream(output)) {
-            fos.write(imageBytes);
-            fos.flush();
-        }
-        return output;
+private File persistTempImage(byte[] imageBytes, String mimeType) throws IOException {
+    if (cacheDirPath == null) {
+        throw new IOException("Diretoria de cache indisponível.");
     }
+
+    File output = new File(
+            cacheDirPath,
+            "dyslexai-image-" + UUID.randomUUID() + guessExtension(mimeType)
+    );
+
+    try (FileOutputStream fos = new FileOutputStream(output)) {
+        fos.write(imageBytes);
+        fos.flush();
+    }
+
+    output.setReadable(true, false);
+
+    return output;
+}
 
     private String guessExtension(String mimeType) {
         if (mimeType == null || mimeType.isBlank()) return ".jpg";

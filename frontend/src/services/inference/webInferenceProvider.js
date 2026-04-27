@@ -33,9 +33,14 @@ export function createWebInferenceProvider() {
       }
     },
 
-    async processAudio(file) {
+    async generateReadingPhrase(_options) {
+      throw new Error('generateReadingPhrase ainda não disponível no backend web.')
+    },
+
+    async processAudio(file, expectedText) {
       const formData = new FormData()
       formData.append('audio', file)
+      if (expectedText) formData.append('expected_text', expectedText)
 
       const response = await fetch(`${API_BASE_URL}/api/process-audio`, {
         method: 'POST',

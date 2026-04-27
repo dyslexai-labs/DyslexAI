@@ -18,6 +18,8 @@ object LiteRtBridge {
             modelPath = modelPath,
             backend = Backend.CPU(),
             visionBackend = if (enableVision) Backend.GPU() else null,
+            maxNumTokens = 512,
+            maxNumImages = if (enableVision) 1 else null,
             cacheDir = cacheDir,
         )
 
@@ -49,6 +51,11 @@ object LiteRtBridge {
         } finally {
             conversation.close()
         }
+    }
+
+    @JvmStatic
+    fun runAudio(engine: Engine, audioPath: String, prompt: String): String {
+        throw UnsupportedOperationException("Áudio ainda não ligado ao LiteRtBridge nesta etapa.")
     }
 
     private fun createConversation(engine: Engine): Conversation {

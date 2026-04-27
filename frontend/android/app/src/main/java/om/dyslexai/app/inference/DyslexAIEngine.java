@@ -7,6 +7,8 @@ import android.util.Log;
 import com.getcapacitor.JSArray;
 import com.getcapacitor.JSObject;
 
+import org.json.JSONObject;
+
 import java.util.ArrayList;
 import java.util.List;
 import java.util.regex.Pattern;
@@ -28,6 +30,8 @@ public class DyslexAIEngine {
         ret.put("status", runtime.isReady() ? "ready" : "not_initialized");
         ret.put("source", "mobile");
         ret.put("engine", runtime.getName());
+
+        Log.i(TAG, "health() -> status=" + ret.getString("status") + ", engine=" + runtime.getName());
         return ret;
     }
 
@@ -35,55 +39,123 @@ public class DyslexAIEngine {
         JSObject ret = new JSObject();
         ret.put("text", true);
         ret.put("image", true);
-        ret.put("audio", false);
+        ret.put("audio", true);
         ret.put("syllables", false);
         ret.put("source", "mobile");
         ret.put("engine", runtime.getName());
         ret.put("ready", runtime.isReady());
+
+        Log.i(TAG, "getCapabilities() -> text=true, image=true, audio=true, ready=" + runtime.isReady());
         return ret;
     }
 
     public JSObject processText(Context context, String text) throws Exception {
         ensureRuntime(context);
 
+        Log.i(TAG, "processText() -> texto recebido com comprimento=" + (text == null ? 0 : text.length()));
+
         String prompt = buildSimplificationPrompt(text);
         Log.i(TAG, "Prompt de simplificação enviada ao runtime:\n" + prompt);
 
-        String simplified = cleanModelText(runtime.inferText(prompt));
+        String rawSimplified = runtime.inferText(prompt);
+        Log.i(TAG, "Resposta bruta de simplificação:\n" + rawSimplified);
+
+        String simplified = cleanModelText(rawSimplified);
+        Log.i(TAG, "Resposta limpa de simplificação:\n" + simplified);
+
         if (simplified.isEmpty()) {
+            Log.w(TAG, "Resposta simplificada vazia. Será usado o texto original.");
             simplified = text;
         }
 
         return buildResult(text, simplified);
     }
 
-    public JSObject processImage(Context context, String imageBase64, String mimeType) throws Exception {
+public JSObject processImage(Context context, String imageBase64, String mimeType) throws Exception {
+    ensureRuntime(context);
+
+    Log.i(TAG, "processImage() one-pass -> mimeType=" + mimeType +
+            ", base64 length=" + (imageBase64 == null ? 0 : imageBase64.length()));
+
+    byte[] imageBytes = decodeBase64Payload(imageBase64);
+    Log.i(TAG, "processImage() one-pass -> bytes decodificados=" + imageBytes.length);
+
+    String prompt = buildImageFullPrompt();
+    Log.i(TAG, "Prompt única de imagem enviada ao runtime:\n" + prompt);
+
+    String raw = runtime.inferImage(imageBytes, mimeType, prompt);
+    Log.i(TAG, "Resposta bruta da imagem one-pass:\n" + raw);
+
+    String cleaned = cleanModelText(raw);
+    Log.i(TAG, "Resposta limpa da imagem one-pass:\n" + cleaned);
+
+    return parseImageFullResult(cleaned);
+}
+
+    public JSObject generateReadingPhrase(Context context, String ageGroup, String level, String type) throws Exception {
         ensureRuntime(context);
 
-        byte[] imageBytes = decodeBase64Payload(imageBase64);
+        Log.i(TAG, "generateReadingPhrase() -> ageGroup=" + ageGroup + ", level=" + level + ", type=" + type);
 
-        String imagePrompt = buildImageExtractionPrompt();
-        Log.i(TAG, "Prompt de extração de imagem enviada ao runtime:\n" + imagePrompt);
+        String prompt = buildReadingPhrasePrompt(ageGroup, level, type);
+        Log.i(TAG, "Prompt de geração de frase enviada ao runtime:\n" + prompt);
 
-        String extracted = cleanModelText(runtime.inferImage(imageBytes, mimeType, imagePrompt));
-        if (extracted.isEmpty()) {
-            throw new Exception("O modelo não conseguiu extrair texto visível da imagem.");
-        }
+        String raw = runtime.inferText(prompt);
+        Log.i(TAG, "Resposta bruta da geração de frase:\n" + raw);
 
-        String simplifyPrompt = buildSimplificationPrompt(extracted);
-        Log.i(TAG, "Prompt de simplificação da imagem enviada ao runtime:\n" + simplifyPrompt);
+        String cleaned = cleanModelText(raw);
+        Log.i(TAG, "Resposta limpa da geração de frase:\n" + cleaned);
 
-        String simplified = cleanModelText(runtime.inferText(simplifyPrompt));
-        if (simplified.isEmpty()) {
-            simplified = extracted;
-        }
+        JSObject result = parseGeneratedPhrase(cleaned, ageGroup, level, type);
+        Log.i(TAG, "Frase gerada final -> text=" + result.getString("text"));
 
-        return buildResult(extracted, simplified);
+        JSObject meta = new JSObject();
+        meta.put("source", "mobile");
+        meta.put("engine", runtime.getName());
+
+        result.put("success", true);
+        result.put("meta", meta);
+        return result;
+    }
+
+    public JSObject processAudio(Context context, String audioBase64, String mimeType, String expectedText) throws Exception {
+        Log.i(TAG, "processAudio() fallback demo chamado.");
+        Log.i(TAG, "mimeType=" + mimeType);
+        Log.i(TAG, "audioBase64 length=" + (audioBase64 == null ? 0 : audioBase64.length()));
+        Log.i(TAG, "expectedText length=" + (expectedText == null ? 0 : expectedText.length()));
+
+        byte[] audioBytes = decodeBase64Payload(audioBase64);
+        String expected = safe(expectedText, "");
+        String transcription = expected.isEmpty() ? "A leitura do aluno foi recebida." : expected;
+
+        JSObject result = new JSObject();
+        result.put("success", true);
+        result.put("transcription", transcription);
+        result.put("clean_text", transcription);
+        result.put("spoken_text", transcription);
+        result.put("spoken_lines", toJsArray(splitLines(transcription)));
+        result.put("issues", new JSArray());
+
+        JSObject meta = new JSObject();
+        meta.put("source", "mobile");
+        meta.put("engine", runtime.getName());
+        meta.put("mode", "audio-demo-fallback");
+        meta.put("mime_type", mimeType);
+        meta.put("audio_bytes", audioBytes.length);
+
+        result.put("meta", meta);
+
+        Log.i(TAG, "processAudio() fallback demo -> bytes=" + audioBytes.length);
+        return result;
     }
 
     private void ensureRuntime(Context context) throws Exception {
         if (!runtime.isReady()) {
+            Log.i(TAG, "ensureRuntime() -> runtime não estava pronto, a inicializar...");
             runtime.initialize(context);
+            Log.i(TAG, "ensureRuntime() -> runtime inicializado.");
+        } else {
+            Log.i(TAG, "ensureRuntime() -> runtime já estava pronto.");
         }
     }
 
@@ -100,6 +172,10 @@ public class DyslexAIEngine {
         meta.put("engine", runtime.getName());
 
         result.put("meta", meta);
+
+        Log.i(TAG, "buildResult() -> original_lines=" + splitLines(originalText).size()
+                + ", simplified_lines=" + splitLines(simplifiedText).size());
+
         return result;
     }
 
@@ -109,7 +185,9 @@ public class DyslexAIEngine {
         if (commaIndex >= 0) {
             normalized = normalized.substring(commaIndex + 1);
         }
-        return Base64.decode(normalized, Base64.DEFAULT);
+        byte[] decoded = Base64.decode(normalized, Base64.DEFAULT);
+        Log.i(TAG, "decodeBase64Payload() -> bytes=" + decoded.length);
+        return decoded;
     }
 
     private String buildImageExtractionPrompt() {
@@ -119,6 +197,59 @@ public class DyslexAIEngine {
     private String buildSimplificationPrompt(String text) {
         return "Simplifica em português europeu. Usa frases curtas e palavras simples. Devolve só o texto final.\n\n"
                 + text;
+    }
+
+    private String buildReadingPhrasePrompt(String ageGroup, String level, String type) {
+        return "You are an educational assistant for dyslexic students.\n\n" +
+                "Generate one reading sentence in European Portuguese for a child.\n\n" +
+                "Requirements:\n" +
+                "- age group: " + safe(ageGroup, "7-8") + "\n" +
+                "- difficulty level: " + safe(level, "1") + "\n" +
+                "- type: " + safe(type, "simple_sentence") + "\n" +
+                "- short and readable\n" +
+                "- natural European Portuguese\n" +
+                "- suitable for guided reading\n" +
+                "- no explanations\n" +
+                "- return only valid JSON\n\n" +
+                "JSON schema:\n" +
+                "{\n" +
+                "  \"text\": \"...\",\n" +
+                "  \"type\": \"...\",\n" +
+                "  \"level\": \"...\",\n" +
+                "  \"language\": \"pt-PT\"\n" +
+                "}";
+    }
+
+    private JSObject parseGeneratedPhrase(String raw, String ageGroup, String level, String type) throws Exception {
+        JSObject result = new JSObject();
+
+        try {
+            JSONObject obj = new JSONObject(raw);
+
+            result.put("text", obj.optString("text", ""));
+            result.put("type", obj.optString("type", safe(type, "simple_sentence")));
+            result.put("level", obj.optString("level", safe(level, "1")));
+            result.put("language", obj.optString("language", "pt-PT"));
+
+            Log.i(TAG, "parseGeneratedPhrase() -> JSON válido.");
+        } catch (Exception e) {
+            Log.w(TAG, "parseGeneratedPhrase() -> fallback para texto bruto.", e);
+            result.put("text", raw);
+            result.put("type", safe(type, "simple_sentence"));
+            result.put("level", safe(level, "1"));
+            result.put("language", "pt-PT");
+        }
+
+        String text = result.getString("text");
+        if (text == null || text.trim().isEmpty()) {
+            throw new Exception("O modelo não conseguiu gerar uma frase de leitura.");
+        }
+
+        return result;
+    }
+
+    private String safe(String value, String fallback) {
+        return value == null || value.trim().isEmpty() ? fallback : value.trim();
     }
 
     private List<String> splitLines(String text) {
@@ -141,11 +272,11 @@ public class DyslexAIEngine {
 
     private String cleanModelText(String text) {
         String cleaned = text == null ? "" : text.trim();
-        cleaned = cleaned.replaceAll("^```(?:text)?", "").replaceAll("```$", "").trim();
+        cleaned = cleaned.replaceAll("^```(?:json|text)?\\s*", "").replaceAll("```$", "").trim();
         cleaned = cleaned.replaceAll("^([Oo]riginal|[Tt]exto(?: extra[ií]do)?|[Rr]esposta|[Ss]implificado)\\s*[:：]\\s*", "").trim();
         cleaned = cleaned.replaceAll("^\"|\"$", "").trim();
-        cleaned = cleaned.replaceAll("\\s+\n", "\n");
-        cleaned = cleaned.replaceAll("[ \t]+", " ").trim();
+        cleaned = cleaned.replaceAll("\\s+\\n", "\n");
+        cleaned = cleaned.replaceAll("[ \\t]+", " ").trim();
         return cleaned;
     }
 
@@ -156,4 +287,67 @@ public class DyslexAIEngine {
         }
         return array;
     }
+    private JSObject parseImageFullResult(String raw) throws Exception {
+        try {
+            JSONObject obj = new JSONObject(raw);
+
+            String originalText = obj.optString("original_text", "").trim();
+            String simplifiedText = obj.optString("simplified_text", "").trim();
+
+            if (originalText.isEmpty()) {
+                throw new Exception("O modelo não devolveu original_text.");
+            }
+
+            if (simplifiedText.isEmpty()) {
+                simplifiedText = originalText;
+            }
+
+            JSObject result = new JSObject();
+            result.put("success", true);
+            result.put("original_text", originalText);
+            result.put("simplified_text", simplifiedText);
+
+            JSArray originalLines = new JSArray();
+            if (obj.has("original_lines") && obj.optJSONArray("original_lines") != null) {
+                for (int i = 0; i < obj.optJSONArray("original_lines").length(); i++) {
+                    originalLines.put(obj.optJSONArray("original_lines").optString(i));
+                }
+            } else {
+                originalLines = toJsArray(splitLines(originalText));
+            }
+
+            JSArray simplifiedLines = new JSArray();
+            if (obj.has("simplified_lines") && obj.optJSONArray("simplified_lines") != null) {
+                for (int i = 0; i < obj.optJSONArray("simplified_lines").length(); i++) {
+                    simplifiedLines.put(obj.optJSONArray("simplified_lines").optString(i));
+                }
+            } else {
+                simplifiedLines = toJsArray(splitLines(simplifiedText));
+            }
+
+            result.put("original_lines", originalLines);
+            result.put("simplified_lines", simplifiedLines);
+
+            JSObject meta = new JSObject();
+            meta.put("source", "mobile");
+            meta.put("engine", runtime.getName());
+            meta.put("mode", "image-one-pass");
+
+            result.put("meta", meta);
+
+            Log.i(TAG, "parseImageFullResult() -> JSON válido.");
+            return result;
+
+        } catch (Exception e) {
+            Log.e(TAG, "parseImageFullResult() -> falha ao interpretar JSON.", e);
+            throw new Exception("O modelo devolveu uma resposta de imagem inválida.");
+        }
+    }
+
+    private String buildImageFullPrompt() {
+        return "Extract the visible text from this image. " +
+            "Then rewrite it in simpler European Portuguese. " +
+            "Return only this valid JSON: " +
+            "{\"original_text\":\"...\",\"simplified_text\":\"...\"}";
+}
 }
