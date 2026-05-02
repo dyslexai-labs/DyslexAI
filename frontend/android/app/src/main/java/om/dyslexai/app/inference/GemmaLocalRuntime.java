@@ -31,7 +31,7 @@ public class GemmaLocalRuntime implements LocalModelRuntime {
         cacheDirPath = context.getCacheDir().getAbsolutePath();
 
         Log.i(TAG, "Modelo encontrado: " + MODEL_PATH);
-        Log.i(TAG, "A inicializar engine LiteRT-LM com suporte de visão...");
+        Log.i(TAG, "A inicializar engine LiteRT-LM com suporte de visão e áudio...");
 
         engine = LiteRtBridge.createEngine(MODEL_PATH, cacheDirPath, true);
 
@@ -88,40 +88,75 @@ public class GemmaLocalRuntime implements LocalModelRuntime {
         Log.i(TAG, "Tamanho do áudio em bytes: " + (audioBytes == null ? 0 : audioBytes.length));
         Log.i(TAG, "Prompt de áudio enviada:\n" + prompt);
 
-        throw new UnsupportedOperationException("Áudio ainda não ligado ao LiteRtBridge nesta etapa.");
+        File audioFile = persistTempAudio(audioBytes, mimeType);
+        Log.i(TAG, "A inferir áudio localmente: " + audioFile.getAbsolutePath());
+
+        String response = LiteRtBridge.runAudioFile(engine, audioFile.getAbsolutePath(), prompt);
+
+        Log.i(TAG, "Resposta de áudio recebida:\n" + response);
+        return response;
     }
 
     @Override
     public String getName() {
-        return "gemma3-270m-local";
+        return "gemma-3n-e2b-local";
     }
 
-private File persistTempImage(byte[] imageBytes, String mimeType) throws IOException {
-    if (cacheDirPath == null) {
-        throw new IOException("Diretoria de cache indisponível.");
+    private File persistTempImage(byte[] imageBytes, String mimeType) throws IOException {
+        if (cacheDirPath == null) {
+            throw new IOException("Diretoria de cache indisponível.");
+        }
+
+        File output = new File(
+                cacheDirPath,
+                "dyslexai-image-" + UUID.randomUUID() + guessImageExtension(mimeType)
+        );
+
+        try (FileOutputStream fos = new FileOutputStream(output)) {
+            fos.write(imageBytes);
+            fos.flush();
+        }
+
+        output.setReadable(true, false);
+        return output;
     }
 
-    File output = new File(
-            cacheDirPath,
-            "dyslexai-image-" + UUID.randomUUID() + guessExtension(mimeType)
-    );
+    private File persistTempAudio(byte[] audioBytes, String mimeType) throws IOException {
+        if (cacheDirPath == null) {
+            throw new IOException("Diretoria de cache indisponível.");
+        }
 
-    try (FileOutputStream fos = new FileOutputStream(output)) {
-        fos.write(imageBytes);
-        fos.flush();
+        File output = new File(
+                cacheDirPath,
+                "dyslexai-audio-" + UUID.randomUUID() + guessAudioExtension(mimeType)
+        );
+
+        try (FileOutputStream fos = new FileOutputStream(output)) {
+            fos.write(audioBytes);
+            fos.flush();
+        }
+
+        output.setReadable(true, false);
+        return output;
     }
 
-    output.setReadable(true, false);
-
-    return output;
-}
-
-    private String guessExtension(String mimeType) {
+    private String guessImageExtension(String mimeType) {
         if (mimeType == null || mimeType.isBlank()) return ".jpg";
 
         String normalized = mimeType.toLowerCase(Locale.ROOT);
         if (normalized.contains("png")) return ".png";
         if (normalized.contains("webp")) return ".webp";
         return ".jpg";
+    }
+
+    private String guessAudioExtension(String mimeType) {
+        if (mimeType == null || mimeType.isBlank()) return ".wav";
+
+        String normalized = mimeType.toLowerCase(Locale.ROOT);
+        if (normalized.contains("wav")) return ".wav";
+        if (normalized.contains("mp4") || normalized.contains("m4a")) return ".m4a";
+        if (normalized.contains("webm")) return ".webm";
+        if (normalized.contains("ogg")) return ".ogg";
+        return ".wav";
     }
 }

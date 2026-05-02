@@ -18,6 +18,7 @@ object LiteRtBridge {
             modelPath = modelPath,
             backend = Backend.CPU(),
             visionBackend = if (enableVision) Backend.GPU() else null,
+            audioBackend = Backend.CPU(),
             maxNumTokens = 512,
             maxNumImages = if (enableVision) 1 else null,
             cacheDir = cacheDir,
@@ -54,8 +55,23 @@ object LiteRtBridge {
     }
 
     @JvmStatic
-    fun runAudio(engine: Engine, audioPath: String, prompt: String): String {
-        throw UnsupportedOperationException("Áudio ainda não ligado ao LiteRtBridge nesta etapa.")
+    fun runAudioFile(engine: Engine, audioPath: String, prompt: String): String {
+        val conversation = createConversation(engine)
+
+        return try {
+            android.util.Log.i("LiteRtBridge", "runAudioFile() -> path=$audioPath")
+
+            val message = conversation.sendMessage(
+                Contents.of(
+                    Content.AudioFile(audioPath),
+                    Content.Text(prompt)
+                )
+            )
+
+            extractText(message)
+        } finally {
+            conversation.close()
+        }
     }
 
     private fun createConversation(engine: Engine): Conversation {
@@ -75,12 +91,28 @@ object LiteRtBridge {
     }
 
     private fun extractText(message: Message): String {
-        val text = message.contents.contents
-            .filterIsInstance<Content.Text>()
+        val allParts = message.contents.contents
+        val textParts = allParts.filterIsInstance<Content.Text>()
+
+        android.util.Log.i(
+            "LiteRtBridge",
+            "extractText() -> total parts=${allParts.size}, text parts=${textParts.size}"
+        )
+
+        allParts.forEachIndexed { index, part ->
+            android.util.Log.i(
+                "LiteRtBridge",
+                "extractText() -> part[$index]=${part::class.java.simpleName} | $part"
+            )
+        }
+
+        val text = textParts
             .joinToString("\n") { it.text }
             .trim()
 
         if (text.isNotBlank()) return text
-        return message.toString().trim()
+
+        val fallback = message.toString().trim()
+        return if (fallback.isNotBlank()) fallback else "[VAZIO]"
     }
 }

@@ -38,7 +38,7 @@ export function createMobileInferenceProvider() {
 
       return DyslexAIPlugin.processAudio({
         audioBase64,
-        mimeType: file?.type || 'audio/webm',
+        mimeType: file?.type || 'audio/wav',
         expectedText,
       })
     },
@@ -52,6 +52,14 @@ export function createMobileInferenceProvider() {
 
     async stopSpeaking() {
       return DyslexAIPlugin.stopSpeaking()
+    },
+
+    async startWavRecording() {
+      return DyslexAIPlugin.startWavRecording()
+    },
+
+    async stopWavRecording() {
+      return DyslexAIPlugin.stopWavRecording()
     },
   }
 }

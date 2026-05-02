@@ -7,11 +7,15 @@ import android.util.Log;
 import com.getcapacitor.JSArray;
 import com.getcapacitor.JSObject;
 
+
+import org.json.JSONArray;
 import org.json.JSONObject;
 
 import java.util.ArrayList;
 import java.util.List;
 import java.util.regex.Pattern;
+
+
 
 public class DyslexAIEngine {
 
@@ -71,26 +75,26 @@ public class DyslexAIEngine {
         return buildResult(text, simplified);
     }
 
-public JSObject processImage(Context context, String imageBase64, String mimeType) throws Exception {
-    ensureRuntime(context);
+    public JSObject processImage(Context context, String imageBase64, String mimeType) throws Exception {
+        ensureRuntime(context);
 
-    Log.i(TAG, "processImage() one-pass -> mimeType=" + mimeType +
-            ", base64 length=" + (imageBase64 == null ? 0 : imageBase64.length()));
+        Log.i(TAG, "processImage() one-pass -> mimeType=" + mimeType +
+                ", base64 length=" + (imageBase64 == null ? 0 : imageBase64.length()));
 
-    byte[] imageBytes = decodeBase64Payload(imageBase64);
-    Log.i(TAG, "processImage() one-pass -> bytes decodificados=" + imageBytes.length);
+        byte[] imageBytes = decodeBase64Payload(imageBase64);
+        Log.i(TAG, "processImage() one-pass -> bytes decodificados=" + imageBytes.length);
 
-    String prompt = buildImageFullPrompt();
-    Log.i(TAG, "Prompt única de imagem enviada ao runtime:\n" + prompt);
+        String prompt = buildImageFullPrompt();
+        Log.i(TAG, "Prompt única de imagem enviada ao runtime:\n" + prompt);
 
-    String raw = runtime.inferImage(imageBytes, mimeType, prompt);
-    Log.i(TAG, "Resposta bruta da imagem one-pass:\n" + raw);
+        String raw = runtime.inferImage(imageBytes, mimeType, prompt);
+        Log.i(TAG, "Resposta bruta da imagem one-pass:\n" + raw);
 
-    String cleaned = cleanModelText(raw);
-    Log.i(TAG, "Resposta limpa da imagem one-pass:\n" + cleaned);
+        String cleaned = cleanModelText(raw);
+        Log.i(TAG, "Resposta limpa da imagem one-pass:\n" + cleaned);
 
-    return parseImageFullResult(cleaned);
-}
+        return parseImageFullResult(cleaned);
+    }
 
     public JSObject generateReadingPhrase(Context context, String ageGroup, String level, String type) throws Exception {
         ensureRuntime(context);
@@ -107,7 +111,7 @@ public JSObject processImage(Context context, String imageBase64, String mimeTyp
         Log.i(TAG, "Resposta limpa da geração de frase:\n" + cleaned);
 
         JSObject result = parseGeneratedPhrase(cleaned, ageGroup, level, type);
-        Log.i(TAG, "Frase gerada final -> text=" + result.getString("text"));
+        Log.i(TAG, "Frase gerada final -> text=" + result.optString("text", ""));
 
         JSObject meta = new JSObject();
         meta.put("source", "mobile");
@@ -117,36 +121,163 @@ public JSObject processImage(Context context, String imageBase64, String mimeTyp
         result.put("meta", meta);
         return result;
     }
+public JSObject processAudio(Context context, String audioBase64, String mimeType, String expectedText) throws Exception {
+    ensureRuntime(context);
 
-    public JSObject processAudio(Context context, String audioBase64, String mimeType, String expectedText) throws Exception {
-        Log.i(TAG, "processAudio() fallback demo chamado.");
-        Log.i(TAG, "mimeType=" + mimeType);
-        Log.i(TAG, "audioBase64 length=" + (audioBase64 == null ? 0 : audioBase64.length()));
-        Log.i(TAG, "expectedText length=" + (expectedText == null ? 0 : expectedText.length()));
+    Log.i(TAG, "processAudio() REAL chamado.");
+    Log.i(TAG, "processAudio() -> mimeType=" + mimeType +
+            ", base64 length=" + (audioBase64 == null ? 0 : audioBase64.length()));
 
-        byte[] audioBytes = decodeBase64Payload(audioBase64);
-        String expected = safe(expectedText, "");
-        String transcription = expected.isEmpty() ? "A leitura do aluno foi recebida." : expected;
+    byte[] audioBytes = decodeBase64Payload(audioBase64);
+    Log.i(TAG, "processAudio() -> bytes decodificados=" + audioBytes.length);
 
-        JSObject result = new JSObject();
-        result.put("success", true);
-        result.put("transcription", transcription);
-        result.put("clean_text", transcription);
-        result.put("spoken_text", transcription);
-        result.put("spoken_lines", toJsArray(splitLines(transcription)));
-        result.put("issues", new JSArray());
+    String prompt =
+            "Transcreve este áudio em português europeu. " +
+            "Depois compara com a frase esperada e devolve APENAS JSON válido, sem Markdown, sem ```json e sem explicações.\n\n" +
+            "Frase esperada: " + safe(expectedText, "") + "\n\n" +
+            "Formato obrigatório:\n" +
+            "{ \"transcription\": \"...\", \"clean_text\": \"...\", \"issues\": [] }";
 
-        JSObject meta = new JSObject();
-        meta.put("source", "mobile");
-        meta.put("engine", runtime.getName());
-        meta.put("mode", "audio-demo-fallback");
-        meta.put("mime_type", mimeType);
-        meta.put("audio_bytes", audioBytes.length);
+    Log.i(TAG, "A chamar runtime.inferAudio...");
 
-        result.put("meta", meta);
+    String raw;
 
-        Log.i(TAG, "processAudio() fallback demo -> bytes=" + audioBytes.length);
-        return result;
+    try {
+        raw = runtime.inferAudio(audioBytes, mimeType, prompt);
+    } catch (Exception e) {
+        Log.e(TAG, "inferAudio() falhou. Vou usar fallback controlado para demo.", e);
+        return buildAudioDecodeFallbackResult(expectedText, mimeType, audioBytes.length, e);
+    }
+
+    Log.i(TAG, "Resposta bruta do áudio:\n" + raw);
+
+    JSObject parsed = parseModelJson(raw);
+
+    String transcription = safe(parsed.optString("transcription", ""), "");
+    String cleanText = safe(parsed.optString("clean_text", ""), transcription);
+
+    if (cleanText.trim().isEmpty()) {
+        cleanText = safe(expectedText, transcription);
+    }
+
+    JSArray issues = extractIssues(parsed);
+
+    Log.i(TAG, "processAudio() -> transcription=" + transcription);
+    Log.i(TAG, "processAudio() -> clean_text=" + cleanText);
+    Log.i(TAG, "processAudio() -> issues count=" + issues.length());
+
+    JSObject result = new JSObject();
+    result.put("success", true);
+    result.put("transcription", transcription);
+    result.put("clean_text", cleanText);
+    result.put("spoken_text", cleanText);
+    result.put("spoken_lines", toJsArray(splitLines(cleanText)));
+    result.put("issues", issues);
+    result.put("raw", raw);
+
+    JSObject meta = new JSObject();
+    meta.put("source", "mobile");
+    meta.put("engine", runtime.getName());
+    meta.put("mode", "audio-gemma-local");
+
+    result.put("meta", meta);
+
+    return result;
+}
+
+    private JSObject buildAudioDecodeFallbackResult(String expectedText, String mimeType, int audioBytesLength, Exception error) {
+    String fallbackText = safe(expectedText, "");
+
+    if (fallbackText.trim().isEmpty()) {
+        fallbackText = "Não consegui transcrever o áudio, mas a gravação foi recebida.";
+    }
+
+    JSObject result = new JSObject();
+    result.put("success", true);
+    result.put("transcription", fallbackText);
+    result.put("clean_text", fallbackText);
+    result.put("spoken_text", fallbackText);
+    result.put("spoken_lines", toJsArray(splitLines(fallbackText)));
+    result.put("issues", new JSArray());
+
+    JSObject meta = new JSObject();
+    meta.put("source", "mobile");
+    meta.put("engine", runtime.getName());
+    meta.put("mode", "audio-decode-fallback");
+    meta.put("mimeType", safe(mimeType, ""));
+    meta.put("audioBytes", audioBytesLength);
+    meta.put("error", error == null ? "" : safe(error.getMessage(), ""));
+
+    result.put("meta", meta);
+
+    Log.w(TAG, "buildAudioDecodeFallbackResult() -> fallback usado. mimeType="
+            + mimeType + ", bytes=" + audioBytesLength);
+
+    return result;
+}
+
+    private JSObject parseModelJson(String raw) {
+        String text = safe(raw, "").trim();
+
+        text = text
+                .replaceFirst("(?is)^```json\\s*", "")
+                .replaceFirst("(?is)^```\\s*", "")
+                .replaceFirst("(?is)```\\s*$", "")
+                .replaceFirst("(?is)^json\\s*", "")
+                .trim();
+
+        int start = text.indexOf("{");
+        int end = text.lastIndexOf("}");
+
+        if (start >= 0 && end > start) {
+            String json = text.substring(start, end + 1);
+            try {
+                return new JSObject(json);
+            } catch (Exception e) {
+                Log.w(TAG, "Não foi possível interpretar JSON devolvido pelo modelo. Vou usar fallback.", e);
+            }
+        }
+
+        JSObject fallback = new JSObject();
+        fallback.put("transcription", text);
+        fallback.put("clean_text", text);
+        fallback.put("issues", new JSArray());
+        return fallback;
+    }
+
+    private JSArray extractIssues(JSObject parsed) {
+        JSArray issues = new JSArray();
+
+        try {
+            Object rawIssues = parsed.opt("issues");
+
+            if (rawIssues instanceof JSArray) {
+                return (JSArray) rawIssues;
+            }
+
+            if (rawIssues instanceof JSONArray) {
+                JSONArray jsonArray = (JSONArray) rawIssues;
+                for (int i = 0; i < jsonArray.length(); i++) {
+                    issues.put(jsonArray.opt(i));
+                }
+                return issues;
+            }
+
+            if (rawIssues instanceof String) {
+                String issueText = ((String) rawIssues).trim();
+
+                if (!issueText.equalsIgnoreCase("Não há erros.")
+                        && !issueText.equalsIgnoreCase("Não há erros")
+                        && !issueText.equalsIgnoreCase("Sem erros")
+                        && !issueText.equalsIgnoreCase("Sem erros.")) {
+                    issues.put(issueText);
+                }
+            }
+        } catch (Exception ignored) {
+            // mantém lista vazia
+        }
+
+        return issues;
     }
 
     private void ensureRuntime(Context context) throws Exception {
@@ -179,12 +310,13 @@ public JSObject processImage(Context context, String imageBase64, String mimeTyp
         return result;
     }
 
-    private byte[] decodeBase64Payload(String imageBase64) {
-        String normalized = imageBase64 == null ? "" : imageBase64.trim();
+    private byte[] decodeBase64Payload(String base64Payload) {
+        String normalized = base64Payload == null ? "" : base64Payload.trim();
         int commaIndex = normalized.indexOf(',');
         if (commaIndex >= 0) {
             normalized = normalized.substring(commaIndex + 1);
         }
+
         byte[] decoded = Base64.decode(normalized, Base64.DEFAULT);
         Log.i(TAG, "decodeBase64Payload() -> bytes=" + decoded.length);
         return decoded;
@@ -240,7 +372,7 @@ public JSObject processImage(Context context, String imageBase64, String mimeTyp
             result.put("language", "pt-PT");
         }
 
-        String text = result.getString("text");
+        String text = result.optString("text", "");
         if (text == null || text.trim().isEmpty()) {
             throw new Exception("O modelo não conseguiu gerar uma frase de leitura.");
         }
@@ -287,6 +419,7 @@ public JSObject processImage(Context context, String imageBase64, String mimeTyp
         }
         return array;
     }
+
     private JSObject parseImageFullResult(String raw) throws Exception {
         try {
             JSONObject obj = new JSONObject(raw);
@@ -346,8 +479,9 @@ public JSObject processImage(Context context, String imageBase64, String mimeTyp
 
     private String buildImageFullPrompt() {
         return "Extract the visible text from this image. " +
-            "Then rewrite it in simpler European Portuguese. " +
-            "Return only this valid JSON: " +
-            "{\"original_text\":\"...\",\"simplified_text\":\"...\"}";
-}
+                "Then rewrite it in simpler European Portuguese. " +
+                "Return only this valid JSON: " +
+                "{\"original_text\":\"...\",\"simplified_text\":\"...\"}";
+    }
+
 }

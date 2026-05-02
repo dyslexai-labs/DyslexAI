@@ -1,15 +1,19 @@
 package om.dyslexai.app.plugins;
 
+import android.Manifest;
 import android.os.Bundle;
 import android.speech.tts.TextToSpeech;
 import android.speech.tts.UtteranceProgressListener;
 import android.util.Log;
 
 import com.getcapacitor.JSObject;
+import com.getcapacitor.PermissionState;
 import com.getcapacitor.Plugin;
 import com.getcapacitor.PluginCall;
 import com.getcapacitor.PluginMethod;
 import com.getcapacitor.annotation.CapacitorPlugin;
+import com.getcapacitor.annotation.Permission;
+import com.getcapacitor.annotation.PermissionCallback;
 
 import java.util.Locale;
 import java.util.UUID;
@@ -21,16 +25,23 @@ import om.dyslexai.app.inference.DyslexAIEngine;
 import om.dyslexai.app.inference.LocalModelRuntime;
 import om.dyslexai.app.inference.RuntimeFactory;
 
-@CapacitorPlugin(name = "DyslexAI")
+@CapacitorPlugin(
+        name = "DyslexAI",
+        permissions = {
+                @Permission(strings = { Manifest.permission.RECORD_AUDIO }, alias = "microphone")
+        }
+)
 public class DyslexAIPlugin extends Plugin {
 
     private static final String TAG = "DyslexAIPlugin";
+    private static final String MICROPHONE_PERMISSION = "microphone";
 
     private DyslexAIEngine engine;
     private TextToSpeech textToSpeech;
     private boolean ttsReady = false;
     private final ConcurrentHashMap<String, PluginCall> pendingTtsCalls = new ConcurrentHashMap<>();
     private final ExecutorService executor = Executors.newSingleThreadExecutor();
+    private final WavAudioRecorder wavAudioRecorder = new WavAudioRecorder();
 
     @Override
     public void load() {
@@ -275,5 +286,74 @@ public class DyslexAIPlugin extends Plugin {
             resolvePendingTtsCall(utteranceId, status);
         }
     }
+	@PluginMethod
+	public void startWavRecording(PluginCall call) {
+	    Log.i(TAG, "startWavRecording() chamado.");
+
+	    if (getPermissionState(MICROPHONE_PERMISSION) != PermissionState.GRANTED) {
+	        Log.i(TAG, "startWavRecording() -> a pedir permissão do microfone.");
+	        requestPermissionForAlias(MICROPHONE_PERMISSION, call, "startWavRecordingPermissionCallback");
+	        return;
+	    }
+
+	    executor.execute(() -> {
+	        try {
+	            wavAudioRecorder.start();
+
+            JSObject result = new JSObject();
+            result.put("success", true);
+            result.put("status", "recording");
+            result.put("mimeType", "audio/wav");
+            result.put("sampleRate", 16000);
+            result.put("channels", 1);
+
+            call.resolve(result);
+        } catch (Exception e) {
+            Log.e(TAG, "Erro ao iniciar gravação WAV: " + e.getMessage(), e);
+            call.reject("Erro ao iniciar gravação WAV: " + e.getMessage(), e);
+        }
+	    });
+	}
+
+    @PermissionCallback
+    private void startWavRecordingPermissionCallback(PluginCall call) {
+        if (getPermissionState(MICROPHONE_PERMISSION) != PermissionState.GRANTED) {
+            Log.w(TAG, "startWavRecordingPermissionCallback() -> permissão do microfone recusada.");
+            call.reject("Permissão do microfone recusada.");
+            return;
+        }
+
+        startWavRecording(call);
+    }
+
+@PluginMethod
+public void stopWavRecording(PluginCall call) {
+    Log.i(TAG, "stopWavRecording() chamado.");
+
+    executor.execute(() -> {
+        try {
+            byte[] wavBytes = wavAudioRecorder.stopAndGetWavBytes();
+            String audioBase64 = wavAudioRecorder.toDataUrl(wavBytes);
+
+            JSObject result = new JSObject();
+            result.put("success", true);
+            result.put("status", "stopped");
+            result.put("audioBase64", audioBase64);
+            result.put("mimeType", "audio/wav");
+            result.put("filename", "gravacao-aluno.wav");
+            result.put("size", wavBytes.length);
+            result.put("sampleRate", 16000);
+            result.put("channels", 1);
+
+            Log.i(TAG, "stopWavRecording() -> WAV pronto, bytes=" + wavBytes.length);
+
+            call.resolve(result);
+        } catch (Exception e) {
+            Log.e(TAG, "Erro ao parar gravação WAV: " + e.getMessage(), e);
+            call.reject("Erro ao parar gravação WAV: " + e.getMessage(), e);
+        }
+    });
+}
+
 
 }
