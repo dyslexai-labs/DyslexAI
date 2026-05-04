@@ -473,8 +473,103 @@ public JSObject processAudio(Context context, String audioBase64, String mimeTyp
 
         } catch (Exception e) {
             Log.e(TAG, "parseImageFullResult() -> falha ao interpretar JSON.", e);
+
+            JSObject recovered = recoverImageFullResult(raw);
+            if (recovered != null) {
+                Log.w(TAG, "parseImageFullResult() -> resposta recuperada a partir de JSON parcial.");
+                return recovered;
+            }
+
             throw new Exception("O modelo devolveu uma resposta de imagem inválida.");
         }
+    }
+
+    private JSObject recoverImageFullResult(String raw) {
+        String originalText = extractJsonLikeString(raw, "original_text");
+        String simplifiedText = extractJsonLikeString(raw, "simplified_text");
+
+        if (originalText.trim().isEmpty()) {
+            return null;
+        }
+
+        if (simplifiedText.trim().isEmpty()) {
+            simplifiedText = originalText;
+        }
+
+        JSObject result = new JSObject();
+        result.put("success", true);
+        result.put("original_text", originalText);
+        result.put("simplified_text", simplifiedText);
+        result.put("original_lines", toJsArray(splitLines(originalText)));
+        result.put("simplified_lines", toJsArray(splitLines(simplifiedText)));
+
+        JSObject meta = new JSObject();
+        meta.put("source", "mobile");
+        meta.put("engine", runtime.getName());
+        meta.put("mode", "image-one-pass-recovered");
+
+        result.put("meta", meta);
+        return result;
+    }
+
+    private String extractJsonLikeString(String raw, String key) {
+        String text = safe(raw, "");
+        String marker = "\"" + key + "\"";
+        int markerIndex = text.indexOf(marker);
+        if (markerIndex < 0) return "";
+
+        int colonIndex = text.indexOf(':', markerIndex + marker.length());
+        if (colonIndex < 0) return "";
+
+        int valueStart = text.indexOf('"', colonIndex + 1);
+        if (valueStart < 0) return "";
+
+        StringBuilder value = new StringBuilder();
+        boolean escaping = false;
+
+        for (int i = valueStart + 1; i < text.length(); i += 1) {
+            char current = text.charAt(i);
+
+            if (escaping) {
+                switch (current) {
+                    case 'n':
+                        value.append('\n');
+                        break;
+                    case 'r':
+                        value.append('\r');
+                        break;
+                    case 't':
+                        value.append('\t');
+                        break;
+                    case '"':
+                    case '\\':
+                    case '/':
+                        value.append(current);
+                        break;
+                    default:
+                        value.append(current);
+                        break;
+                }
+                escaping = false;
+                continue;
+            }
+
+            if (current == '\\') {
+                escaping = true;
+                continue;
+            }
+
+            if (current == '"') {
+                String remaining = text.substring(i + 1).trim();
+                if (remaining.startsWith(",") || remaining.startsWith("}")) {
+                    break;
+                }
+            }
+
+            value.append(current);
+        }
+
+        return cleanModelText(value.toString());
     }
 
     private String buildImageFullPrompt() {

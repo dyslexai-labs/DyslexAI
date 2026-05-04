@@ -1,489 +1,102 @@
 <template>
   <div class="player-app" :class="{ fullscreen: isFullscreen }">
     <main class="app-shell">
-<section v-if="screen === 'home'" class="screen-center home-screen">
-        <div class="google-home">
-          <header class="google-home-header">
-            <div class="home-brand">
-              <div class="home-logo-mark" aria-hidden="true"><span class="logo-blue"></span><span class="logo-red"></span><span class="logo-yellow"></span><span class="logo-green"></span></div>
-              <div class="home-brand-copy">
-                <div class="home-brand-title">Dyslex<span>AI</span></div>
-                <div class="home-brand-subtitle">Leitor guiado</div>
-              </div>
-            </div>
-            <button class="home-help-btn" title="Ajuda" aria-label="Ajuda">?</button>
-          </header>
+      <HomeView
+        v-if="screen === 'home'"
+        @start-image="startImageFlow"
+        @start-audio="startAudioFlow"
+        @go-home="goHome"
+      />
 
-          <div class="google-home-main">
-            <section class="home-intro-panel">
-              <div class="home-badge">👋 Bem-vindo(a)!</div>
-              <h1>Escolhe como queres começar</h1>
-              <p>Escolhe uma imagem ou grava a tua voz. Depois lê com ajuda, passo a passo.</p>
-            </section>
+      <ImageSourceView
+        v-else-if="screen === 'select-image-source'"
+        @take-photo="takePhoto"
+        @pick-gallery="pickFromGallery"
+        @go-home="goHome"
+      />
 
-            <section class="home-actions-panel" aria-label="Modos de leitura">
-              <button class="home-option-card home-option-card--blue" @click="startImageFlow">
-                <div class="home-option-icon image-icon" aria-hidden="true">
-                  <svg viewBox="0 0 96 96" role="img" focusable="false">
-                    <rect x="6" y="8" width="84" height="80" rx="18" fill="#dff1ff"/>
-                    <circle cx="68" cy="30" r="9" fill="#fbbc04"/>
-                    <path d="M12 70l23-27 18 20 11-13 20 20v10H12z" fill="#34a853"/>
-                    <path d="M12 69l26-31 24 31z" fill="#2f80ed" opacity=".9"/>
-                    <path d="M42 69l19-23 24 23z" fill="#1a73e8" opacity=".78"/>
-                    <path d="M16 34c7-11 21-11 28 0 6-5 15-3 19 4H16z" fill="#fff" opacity=".92"/>
-                  </svg>
-                </div>
-                <div class="home-option-text"><strong>Leitura assistida</strong><span>Usa uma imagem ou texto para preparar a leitura.</span></div>
-                <div class="home-option-arrow" aria-hidden="true">&gt;</div>
-              </button>
-              <button class="home-option-card home-option-card--green" @click="startAudioFlow">
-                <div class="home-option-icon mic-icon" aria-hidden="true">
-                  <svg viewBox="0 0 96 96" role="img" focusable="false">
-                    <rect x="6" y="8" width="84" height="80" rx="18" fill="#e5f6e8"/>
-                    <rect x="37" y="18" width="22" height="42" rx="11" fill="#34a853"/>
-                    <path d="M26 44c0 14 9 25 22 25s22-11 22-25" fill="none" stroke="#34a853" stroke-width="7" stroke-linecap="round"/>
-                    <path d="M48 69v13M34 82h28" stroke="#34a853" stroke-width="7" stroke-linecap="round"/>
-                    <path d="M61 31h8M61 43h8" stroke="#34a853" stroke-width="5" stroke-linecap="round" opacity=".75"/>
-                  </svg>
-                </div>
-                <div class="home-option-text"><strong>Leitura a partir da fala</strong><span>Grava a fala do aluno e gera uma frase para leitura guiada.</span></div>
-                <div class="home-option-arrow" aria-hidden="true">&gt;</div>
-              </button>
-            </section>
+      <ImageConfirmView
+        v-else-if="screen === 'confirm-image'"
+        :preview-url="previewUrl"
+        @process-image="processImage"
+        @choose-other="startImageFlow"
+        @go-home="goHome"
+      />
 
-            <section class="home-recent-card" aria-label="Atividade recente">
-              <div class="recent-title">Recente</div>
-              <div class="recent-row"><div class="recent-icon">📄</div><div><strong>Lição – Animais da Quinta</strong><span>30/04/2025 · 2 min</span></div><div class="recent-arrow">›</div></div>
-            </section>
+      <AudioPrepareView
+        v-else-if="screen === 'confirm-audio'"
+        v-model:reading-age-group="readingAgeGroup"
+        v-model:reading-level="readingLevel"
+        v-model:reading-type="readingType"
+        :audio-preview-url="audioPreviewUrl"
+        :expected-reading-text="expectedReadingText"
+        :has-recorded-audio="hasRecordedAudio"
+        :is-generating-phrase="isGeneratingPhrase"
+        :is-recorder-busy="isRecorderBusy"
+        :is-recording="isRecording"
+        :selected-audio-name="selectedAudioName"
+        @clear-recorded-audio="clearRecordedAudio"
+        @generate-phrase="generateReadingPhrase"
+        @go-home="goHome"
+        @process-audio="processAudio"
+        @start-recording="startRecording"
+        @stop-recording="stopRecording"
+      />
 
-            <section class="home-safety-card" aria-label="Privacidade e segurança">
-              <div class="safety-icon">🛡️</div><div><strong>Privacidade e segurança</strong><span>Os dados são utilizados apenas para melhorar a experiência de leitura guiada.</span></div><div class="recent-arrow">›</div>
-            </section>
-          </div>
+      <ProcessingView
+        v-else-if="screen === 'processing'"
+        :active-flow="activeFlow"
+        :processing-title="processingTitle"
+        :processing-message="processingMessage"
+        :processing-progress="processingProgress"
+        @go-home="goHome"
+      />
 
-          <nav class="home-bottom-nav" aria-label="Navegação principal">
-            <button class="active" aria-label="Início">
-              <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 10.5 12 4l8 6.5V20a1 1 0 0 1-1 1h-5v-6h-4v6H5a1 1 0 0 1-1-1z" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/></svg>
-              <span>Início</span>
-            </button>
-            <button aria-label="Definições">
-              <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 15.5A3.5 3.5 0 1 0 12 8a3.5 3.5 0 0 0 0 7.5Z" fill="none" stroke="currentColor" stroke-width="2"/><path d="M19.4 15a1.8 1.8 0 0 0 .36 1.98l.05.05-2.1 2.1-.05-.05A1.8 1.8 0 0 0 15.68 18.7a1.8 1.8 0 0 0-1.08 1.65V20.5h-3v-.15a1.8 1.8 0 0 0-1.08-1.65 1.8 1.8 0 0 0-1.98.36l-.05.05-2.1-2.1.05-.05A1.8 1.8 0 0 0 6.8 15a1.8 1.8 0 0 0-1.65-1.08H5v-3h.15A1.8 1.8 0 0 0 6.8 9.84a1.8 1.8 0 0 0-.36-1.98l-.05-.05 2.1-2.1.05.05a1.8 1.8 0 0 0 1.98.36A1.8 1.8 0 0 0 11.6 4.5V4.35h3v.15a1.8 1.8 0 0 0 1.08 1.65 1.8 1.8 0 0 0 1.98-.36l.05-.05 2.1 2.1-.05.05A1.8 1.8 0 0 0 19.4 9.84a1.8 1.8 0 0 0 1.65 1.08H21v3h-.15A1.8 1.8 0 0 0 19.4 15Z" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linejoin="round"/></svg>
-              <span>Definições</span>
-            </button>
-          </nav>
-        </div>
-      </section>
-      <section v-else-if="screen === 'select-image-source'" class="screen-center">
-        <div class="google-home assisted-home">
-          <header class="google-home-header">
-            <div class="home-brand">
-              <div class="home-logo-mark" aria-hidden="true"><span class="logo-blue"></span><span class="logo-red"></span><span class="logo-yellow"></span><span class="logo-green"></span></div>
-              <div class="home-brand-copy">
-                <div class="home-brand-title">Dyslex<span>AI</span></div>
-                <div class="home-brand-subtitle">Leitura assistida</div>
-              </div>
-            </div>
-            <button class="home-help-btn" title="Ajuda" aria-label="Ajuda">?</button>
-          </header>
-
-          <div class="google-home-main">
-            <section class="home-intro-panel assisted-intro-panel">
-              <h1>Escolhe a origem da imagem</h1>
-              <p>Tira uma fotografia da página ou escolhe uma imagem guardada.</p>
-            </section>
-
-            <section class="home-actions-panel assisted-actions-panel" aria-label="Origem da imagem">
-              <button class="home-option-card home-option-card--blue assisted-option-card" @click="takePhoto">
-                <div class="home-option-icon assisted-option-icon" aria-hidden="true">
-                  <svg viewBox="0 0 96 96" role="img" focusable="false">
-                    <rect x="10" y="28" width="76" height="52" rx="16" fill="#eaf4ff"/>
-                    <path d="M32 28l7-10h18l7 10" fill="#1a73e8" opacity=".9"/>
-                    <circle cx="48" cy="54" r="18" fill="#1a73e8"/>
-                    <circle cx="48" cy="54" r="10" fill="#8fd3ff"/>
-                    <circle cx="72" cy="40" r="5" fill="#fbbc04"/>
-                    <path d="M18 73l17-18 13 14 9-9 19 13" fill="none" stroke="#34a853" stroke-width="5" stroke-linecap="round" stroke-linejoin="round"/>
-                  </svg>
-                </div>
-                <div class="home-option-text"><strong>Tirar fotografia</strong><span>Usa a câmara para fotografar a página.</span></div>
-                <div class="home-option-arrow" aria-hidden="true">&gt;</div>
-              </button>
-
-              <button class="home-option-card home-option-card--green assisted-option-card" @click="pickFromGallery">
-                <div class="home-option-icon assisted-option-icon" aria-hidden="true">
-                  <svg viewBox="0 0 96 96" role="img" focusable="false">
-                    <rect x="12" y="14" width="66" height="58" rx="14" fill="#eaf4ff"/>
-                    <rect x="20" y="24" width="66" height="58" rx="14" fill="#dff1ff"/>
-                    <circle cx="66" cy="38" r="7" fill="#fbbc04"/>
-                    <path d="M27 72l18-22 14 16 9-11 12 17" fill="#34a853"/>
-                    <path d="M27 72l23-28 22 28" fill="#1a73e8" opacity=".78"/>
-                  </svg>
-                </div>
-                <div class="home-option-text"><strong>Escolher da galeria</strong><span>Escolhe uma imagem já guardada.</span></div>
-                <div class="home-option-arrow" aria-hidden="true">&gt;</div>
-              </button>
-            </section>
-          </div>
-
-          <nav class="home-bottom-nav" aria-label="Navegação principal">
-            <button aria-label="Início" @click="goHome">
-              <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 10.5 12 4l8 6.5V20a1 1 0 0 1-1 1h-5v-6h-4v6H5a1 1 0 0 1-1-1z" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/></svg>
-              <span>Início</span>
-            </button>
-            <button aria-label="Definições">
-              <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 15.5A3.5 3.5 0 1 0 12 8a3.5 3.5 0 0 0 0 7.5Z" fill="none" stroke="currentColor" stroke-width="2"/><path d="M19.4 15a1.8 1.8 0 0 0 .36 1.98l.05.05-2.1 2.1-.05-.05A1.8 1.8 0 0 0 15.68 18.7a1.8 1.8 0 0 0-1.08 1.65V20.5h-3v-.15a1.8 1.8 0 0 0-1.08-1.65 1.8 1.8 0 0 0-1.98.36l-.05.05-2.1-2.1.05-.05A1.8 1.8 0 0 0 6.8 15a1.8 1.8 0 0 0-1.65-1.08H5v-3h.15A1.8 1.8 0 0 0 6.8 9.84a1.8 1.8 0 0 0-.36-1.98l-.05-.05 2.1-2.1.05.05a1.8 1.8 0 0 0 1.98.36A1.8 1.8 0 0 0 11.6 4.5V4.35h3v.15a1.8 1.8 0 0 0 1.08 1.65 1.8 1.8 0 0 0 1.98-.36l.05-.05 2.1 2.1-.05.05A1.8 1.8 0 0 0 19.4 9.84a1.8 1.8 0 0 0 1.65 1.08H21v3h-.15A1.8 1.8 0 0 0 19.4 15Z" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linejoin="round"/></svg>
-              <span>Definições</span>
-            </button>
-          </nav>
-        </div>
-      </section>
-
-      <section v-else-if="screen === 'confirm-image'" class="screen-center">
-        <div class="google-home review-home">
-          <header class="google-home-header">
-            <div class="home-brand">
-              <div class="home-logo-mark" aria-hidden="true"><span class="logo-blue"></span><span class="logo-red"></span><span class="logo-yellow"></span><span class="logo-green"></span></div>
-              <div class="home-brand-copy">
-                <div class="home-brand-title">Dyslex<span>AI</span></div>
-                <div class="home-brand-subtitle">Leitura assistida</div>
-              </div>
-            </div>
-            <button class="home-help-btn" title="Ajuda" aria-label="Ajuda">?</button>
-          </header>
-
-          <div class="google-home-main">
-            <section class="home-intro-panel review-intro-panel">
-              <h1>Confirma a imagem</h1>
-              <p>Se a página estiver bem visível, prepara a leitura guiada.</p>
-            </section>
-
-            <section class="review-panel" aria-label="Confirmar imagem">
-              <div class="review-preview-card">
-                <img :src="previewUrl" alt="Pré-visualização" class="preview-image" />
-              </div>
-
-              <div class="review-action-card">
-                <div class="confirm-text">
-                  <strong>Imagem pronta</strong>
-                  <span>Podes processar esta imagem ou escolher outra.</span>
-                </div>
-
-                <div class="review-action-row">
-                  <button class="main-action" @click="processImage">Processar</button>
-                  <button class="soft-action" @click="startImageFlow">Outra imagem</button>
-                </div>
-              </div>
-            </section>
-          </div>
-
-          <nav class="home-bottom-nav" aria-label="Navegação principal">
-            <button aria-label="Início" @click="goHome">
-              <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 10.5 12 4l8 6.5V20a1 1 0 0 1-1 1h-5v-6h-4v6H5a1 1 0 0 1-1-1z" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/></svg>
-              <span>Início</span>
-            </button>
-            <button aria-label="Definições">
-              <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 15.5A3.5 3.5 0 1 0 12 8a3.5 3.5 0 0 0 0 7.5Z" fill="none" stroke="currentColor" stroke-width="2"/><path d="M19.4 15a1.8 1.8 0 0 0 .36 1.98l.05.05-2.1 2.1-.05-.05A1.8 1.8 0 0 0 15.68 18.7a1.8 1.8 0 0 0-1.08 1.65V20.5h-3v-.15a1.8 1.8 0 0 0-1.08-1.65 1.8 1.8 0 0 0-1.98.36l-.05.05-2.1-2.1.05-.05A1.8 1.8 0 0 0 6.8 15a1.8 1.8 0 0 0-1.65-1.08H5v-3h.15A1.8 1.8 0 0 0 6.8 9.84a1.8 1.8 0 0 0-.36-1.98l-.05-.05 2.1-2.1.05.05a1.8 1.8 0 0 0 1.98.36A1.8 1.8 0 0 0 11.6 4.5V4.35h3v.15a1.8 1.8 0 0 0 1.08 1.65 1.8 1.8 0 0 0 1.98-.36l.05-.05 2.1 2.1-.05.05A1.8 1.8 0 0 0 19.4 9.84a1.8 1.8 0 0 0 1.65 1.08H21v3h-.15A1.8 1.8 0 0 0 19.4 15Z" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linejoin="round"/></svg>
-              <span>Definições</span>
-            </button>
-          </nav>
-        </div>
-      </section>
-
-      <section v-else-if="screen === 'confirm-audio'" class="screen-center">
-        <div class="google-home speech-home">
-          <header class="google-home-header">
-            <div class="home-brand">
-              <div class="home-logo-mark" aria-hidden="true"><span class="logo-blue"></span><span class="logo-red"></span><span class="logo-yellow"></span><span class="logo-green"></span></div>
-              <div class="home-brand-copy">
-                <div class="home-brand-title">Dyslex<span>AI</span></div>
-                <div class="home-brand-subtitle">Leitura a partir da fala</div>
-              </div>
-            </div>
-            <button class="home-help-btn" title="Ajuda" aria-label="Ajuda">?</button>
-          </header>
-
-          <div class="google-home-main">
-            <section class="home-intro-panel speech-intro-panel">
-              <h1>Prepara a leitura com a tua voz</h1>
-              <p>
-                {{ isRecording
-                  ? 'A gravação está a decorrer. Quando acabares, carrega em Parar.'
-                  : hasRecordedAudio
-                    ? 'A gravação está pronta. Podes ouvir e depois processar.'
-                    : 'Gera uma frase. Depois grava a tua leitura.' }}
-              </p>
-            </section>
-
-            <section class="speech-work-panel" aria-label="Preparar leitura por voz">
-              <div class="speech-config-card">
-                <div class="speech-config-grid">
-                  <label>Idade
-                    <select v-model="readingAgeGroup">
-                      <option value="6-7">6-7</option>
-                      <option value="8-10">8-10</option>
-                      <option value="11-13">11-13</option>
-                    </select>
-                  </label>
-                  <label>Nível
-                    <select v-model="readingLevel">
-                      <option value="1">1</option>
-                      <option value="2">2</option>
-                      <option value="3">3</option>
-                    </select>
-                  </label>
-                  <label>Tipo
-                    <select v-model="readingType">
-                      <option value="simple_sentence">Frase simples</option>
-                      <option value="rhyme">Lengalenga</option>
-                      <option value="tongue_twister">Trava-línguas</option>
-                    </select>
-                  </label>
-                </div>
-
-                <div class="speech-button-row">
-                  <button class="soft-action" @click="generateReadingPhrase"
-                    :disabled="isGeneratingPhrase || isRecording || isRecorderBusy">
-                    {{ isGeneratingPhrase ? 'A gerar...' : 'Gerar frase' }}
-                  </button>
-                  <button v-if="expectedReadingText" class="soft-action" @click="generateReadingPhrase"
-                    :disabled="isGeneratingPhrase || isRecording || isRecorderBusy">
-                    Nova frase
-                  </button>
-                </div>
-              </div>
-
-              <div class="speech-phrase-card">
-                <span class="speech-label">{{ isGeneratingPhrase ? 'Preparação' : 'Frase a ler' }}</span>
-                <strong>{{ isGeneratingPhrase ? 'A gerar frase...' : (expectedReadingText || 'Gera uma frase para começar.') }}</strong>
-              </div>
-
-              <div class="speech-record-card">
-                <div class="speech-record-icon" :class="{ active: isRecording }" aria-hidden="true">
-                  <svg viewBox="0 0 96 96" role="img" focusable="false">
-                    <rect x="6" y="8" width="84" height="80" rx="18" fill="#e5f6e8"/>
-                    <rect x="37" y="18" width="22" height="42" rx="11" fill="#34a853"/>
-                    <path d="M26 44c0 14 9 25 22 25s22-11 22-25" fill="none" stroke="#34a853" stroke-width="7" stroke-linecap="round"/>
-                    <path d="M48 69v13M34 82h28" stroke="#34a853" stroke-width="7" stroke-linecap="round"/>
-                  </svg>
-                </div>
-                <div class="speech-record-copy">
-                  <span class="status-pill" :class="{ live: isRecording, ready: hasRecordedAudio && !isRecording }">
-                    {{ isRecording ? 'A gravar' : (hasRecordedAudio ? 'Gravação pronta' : 'À espera de gravação') }}
-                  </span>
-                  <span v-if="selectedAudioName" class="status-file">{{ selectedAudioName }}</span>
-                  <audio v-if="audioPreviewUrl" :src="audioPreviewUrl" controls class="audio-player"></audio>
-                </div>
-              </div>
-
-              <div class="record-controls speech-record-controls">
-                <button class="main-action" @click="startRecording"
-                  :disabled="isRecording || isRecorderBusy || !expectedReadingText || isGeneratingPhrase">
-                  {{ isRecording ? 'A gravar...' : 'Gravar' }}
-                </button>
-                <button class="soft-action" @click="stopRecording" :disabled="!isRecording">Parar</button>
-                <button class="soft-action" @click="clearRecordedAudio"
-                  :disabled="isRecording || !hasRecordedAudio">Limpar</button>
-                <button class="soft-action" @click="processAudio"
-                  :disabled="isRecording || !hasRecordedAudio || !expectedReadingText">Processar</button>
-              </div>
-            </section>
-          </div>
-
-          <nav class="home-bottom-nav" aria-label="Navegação principal">
-            <button aria-label="Início" @click="goHome">
-              <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 10.5 12 4l8 6.5V20a1 1 0 0 1-1 1h-5v-6h-4v6H5a1 1 0 0 1-1-1z" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/></svg>
-              <span>Início</span>
-            </button>
-            <button aria-label="Definições">
-              <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 15.5A3.5 3.5 0 1 0 12 8a3.5 3.5 0 0 0 0 7.5Z" fill="none" stroke="currentColor" stroke-width="2"/><path d="M19.4 15a1.8 1.8 0 0 0 .36 1.98l.05.05-2.1 2.1-.05-.05A1.8 1.8 0 0 0 15.68 18.7a1.8 1.8 0 0 0-1.08 1.65V20.5h-3v-.15a1.8 1.8 0 0 0-1.08-1.65 1.8 1.8 0 0 0-1.98.36l-.05.05-2.1-2.1.05-.05A1.8 1.8 0 0 0 6.8 15a1.8 1.8 0 0 0-1.65-1.08H5v-3h.15A1.8 1.8 0 0 0 6.8 9.84a1.8 1.8 0 0 0-.36-1.98l-.05-.05 2.1-2.1.05.05a1.8 1.8 0 0 0 1.98.36A1.8 1.8 0 0 0 11.6 4.5V4.35h3v.15a1.8 1.8 0 0 0 1.08 1.65 1.8 1.8 0 0 0 1.98-.36l.05-.05 2.1 2.1-.05.05A1.8 1.8 0 0 0 19.4 9.84a1.8 1.8 0 0 0 1.65 1.08H21v3h-.15A1.8 1.8 0 0 0 19.4 15Z" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linejoin="round"/></svg>
-              <span>Definições</span>
-            </button>
-          </nav>
-        </div>
-      </section>
-
-      <section v-else-if="screen === 'processing'" class="screen-center">
-        <div class="google-home processing-home">
-          <header class="google-home-header">
-            <div class="home-brand">
-              <div class="home-logo-mark" aria-hidden="true"><span class="logo-blue"></span><span class="logo-red"></span><span class="logo-yellow"></span><span class="logo-green"></span></div>
-              <div class="home-brand-copy">
-                <div class="home-brand-title">Dyslex<span>AI</span></div>
-                <div class="home-brand-subtitle">{{ activeFlow === 'audio' ? 'Leitura a partir da fala' : 'Leitura assistida' }}</div>
-              </div>
-            </div>
-            <button class="home-help-btn" title="Ajuda" aria-label="Ajuda">?</button>
-          </header>
-
-          <div class="google-home-main">
-            <section class="processing-panel" aria-live="polite">
-              <div class="loader-ring"></div>
-              <h2>{{ processingTitle }}</h2>
-              <p>{{ processingMessage }}</p>
-
-              <div class="progress-track">
-                <div class="progress-bar" :style="{ width: processingProgress + '%' }"></div>
-              </div>
-            </section>
-          </div>
-
-          <nav class="home-bottom-nav" aria-label="Navegação principal">
-            <button aria-label="Início" @click="goHome">
-              <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 10.5 12 4l8 6.5V20a1 1 0 0 1-1 1h-5v-6h-4v6H5a1 1 0 0 1-1-1z" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/></svg>
-              <span>Início</span>
-            </button>
-            <button aria-label="Definições">
-              <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 15.5A3.5 3.5 0 1 0 12 8a3.5 3.5 0 0 0 0 7.5Z" fill="none" stroke="currentColor" stroke-width="2"/><path d="M19.4 15a1.8 1.8 0 0 0 .36 1.98l.05.05-2.1 2.1-.05-.05A1.8 1.8 0 0 0 15.68 18.7a1.8 1.8 0 0 0-1.08 1.65V20.5h-3v-.15a1.8 1.8 0 0 0-1.08-1.65 1.8 1.8 0 0 0-1.98.36l-.05.05-2.1-2.1.05-.05A1.8 1.8 0 0 0 6.8 15a1.8 1.8 0 0 0-1.65-1.08H5v-3h.15A1.8 1.8 0 0 0 6.8 9.84a1.8 1.8 0 0 0-.36-1.98l-.05-.05 2.1-2.1.05.05a1.8 1.8 0 0 0 1.98.36A1.8 1.8 0 0 0 11.6 4.5V4.35h3v.15a1.8 1.8 0 0 0 1.08 1.65 1.8 1.8 0 0 0 1.98-.36l.05-.05 2.1 2.1-.05.05A1.8 1.8 0 0 0 19.4 9.84a1.8 1.8 0 0 0 1.65 1.08H21v3h-.15A1.8 1.8 0 0 0 19.4 15Z" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linejoin="round"/></svg>
-              <span>Definições</span>
-            </button>
-          </nav>
-        </div>
-      </section>
-
-      <section v-else class="screen-center">
-        <div class="player-card reader-card">
-          <div class="player-top reader-top">
-            <div class="player-corner left">
-              <span class="mini-brand">DyslexAI</span>
-            </div>
-
-            <div class="player-corner right">
-              <button class="corner-btn" @click="toggleFullscreen" title="Ecrã inteiro">
-                {{ isFullscreen ? '⤢' : '⛶' }}
-              </button>
-              <button class="corner-btn" @click="openValidation = true" title="Validação">
-                ☰
-              </button>
-              <button class="corner-btn" @click="resetAll" title="Início">
-                ↺
-              </button>
-            </div>
-
-            <div v-if="readingMode === 'line'" class="reading-focus line-focus"
-              :style="{ fontSize: computedLineFontSize + 'px', color: paletteStyles.lineText }">
-              {{ currentLines[currentLineIndex] || 'Sem texto disponível.' }}
-            </div>
-
-            <div v-else class="reading-focus word-focus" :style="{ fontSize: computedWordContextFontSize + 'px' }">
-              <div class="word-context">
-                <span v-for="(word, index) in currentWords" :key="`${currentLineIndex}-${index}-${word}`"
-                  class="word-chip" :class="{ active: index === currentWordIndex }" :style="index === currentWordIndex
-                    ? { ...activeWordStyle, background: paletteStyles.activeBg, color: paletteStyles.activeText }
-                    : { color: paletteStyles.inactiveWord }">
-                  {{ word }}
-                </span>
-              </div>
-            </div>
-          </div>
-
-          <div class="player-bottom reader-bottom">
-            <div v-if="expectedReadingText" class="speech-summary-box">
-              <span class="speech-label">Frase esperada</span>
-              <strong>{{ expectedReadingText }}</strong>
-            </div>
-
-            <div v-if="audioIssues.length" class="speech-summary-box issues-box">
-              <span class="speech-label">Dificuldades encontradas</span>
-              <ul class="issues-list">
-                <li v-for="(issue, index) in audioIssues" :key="`${issue.type || 'issue'}-${index}`">
-                  <strong>{{ issue.type || 'other' }}</strong> — {{ issue.message || 'Diferença identificada.' }}
-                  <span v-if="issue.expected || issue.heard"> ({{ issue.expected || '—' }} / {{ issue.heard ||
-                    issue.fragment || '—' }})</span>
-                </li>
-              </ul>
-            </div>
-
-            <div v-if="hasSpokenText" class="speech-summary-box">
-              <span class="speech-label">Frase transcrita</span>
-              <strong>{{ spokenText }}</strong>
-              <small v-if="spokenTranscription && spokenTranscription !== spokenText">Transcrição bruta: {{
-                spokenTranscription }}</small>
-            </div>
-
-            <div class="transport-row">
-              <template v-if="readingMode === 'line'">
-                <button class="round-btn" @click="prevLine" :disabled="currentLineIndex === 0">◀</button>
-                <button class="play-btn" @click="toggleLineReading">{{ isSpeakingLine ? '❚❚' : '▶' }}</button>
-                <button class="round-btn" @click="nextLine"
-                  :disabled="currentLineIndex === currentLines.length - 1">▶</button>
-              </template>
-
-              <template v-else>
-                <button class="round-btn" @click="prevWord">◀</button>
-                <button class="play-btn" @click="toggleWordPlay">{{ isPlayingWords ? '❚❚' : '▶' }}</button>
-                <button class="round-btn" @click="nextWord">▶</button>
-              </template>
-            </div>
-
-            <div class="progress-label">
-              <span>Linha {{ currentLineIndex + 1 }}/{{ currentLines.length || 1 }}</span>
-              <span v-if="readingMode === 'word'">· Palavra {{ currentWordIndex + 1 }}/{{ currentWords.length || 1
-                }}</span>
-            </div>
-
-            <div class="progress-line">
-              <div class="progress-fill" :style="{ width: lineProgressPercent + '%' }"></div>
-            </div>
-
-            <div class="controls-compact">
-              <button class="pill-btn" :class="{ active: currentTextMode === 'original' }"
-                @click="switchTextMode('original')">Original</button>
-              <button class="pill-btn" :class="{ active: currentTextMode === 'simplified' }"
-                @click="switchTextMode('simplified')">Simplificado</button>
-              <button v-if="hasSpokenText" class="pill-btn" :class="{ active: currentTextMode === 'spoken' }"
-                @click="switchTextMode('spoken')">Falado</button>
-              <button class="pill-btn" :class="{ active: readingMode === 'line' }"
-                @click="setReadingMode('line')">Linha</button>
-              <button class="pill-btn" :class="{ active: readingMode === 'word' }"
-                @click="setReadingMode('word')">Palavra</button>
-
-              <button v-if="readingMode === 'line'" class="pill-btn" :class="{ active: linePlaybackMode === 'single' }"
-                @click="linePlaybackMode = 'single'">Linha única</button>
-              <button v-if="readingMode === 'line'" class="pill-btn"
-                :class="{ active: linePlaybackMode === 'continuous' }" @click="linePlaybackMode = 'continuous'">
-                {{ isSpeakingLine && linePlaybackMode === 'continuous' ? 'A ler até ao fim' : 'Até ao fim' }}
-              </button>
-
-              <button v-if="readingMode === 'word'" class="pill-btn" :class="{ active: wordAudioMode === 'silent' }"
-                @click="setWordAudioMode('silent')">Sem som</button>
-              <button v-if="readingMode === 'word'" class="pill-btn" :class="{ active: wordAudioMode === 'audio' }"
-                @click="setWordAudioMode('audio')">Com som</button>
-
-              <button class="pill-btn" @click="restartReading">Reiniciar</button>
-              <button class="pill-btn" @click="stopAllAudio">Parar</button>
-              <button class="pill-btn subtle" @click="showSettings = !showSettings">{{ showSettings ? 'Menos' :
-                'Definições'
-                }}</button>
-            </div>
-
-            <div v-if="showSettings" class="settings-panel">
-              <div class="setting-block">
-                <label>Fonte {{ fontSize }}</label>
-                <input v-model.number="fontSize" type="range" min="24" max="44" />
-              </div>
-
-              <div class="setting-block">
-                <label>Velocidade {{ speechRate.toFixed(2) }}</label>
-                <input v-model.number="speechRate" type="range" min="0.6" max="1.8" step="0.05" />
-              </div>
-
-              <div class="setting-block">
-                <label>Cores de leitura</label>
-                <select v-model="readingPalette">
-                  <option value="yellow">Amarelo</option>
-                  <option value="blue">Azul</option>
-                  <option value="green">Verde</option>
-                  <option value="pink">Rosa suave</option>
-                </select>
-              </div>
-
-              <label v-if="readingMode === 'word'" class="check-block">
-                <input v-model="autoAdvanceLine" type="checkbox" />
-                Passar à linha seguinte
-              </label>
-            </div>
-          </div>
-        </div>
-      </section>
+      <ReaderView
+        v-else
+        v-model:auto-advance-line="autoAdvanceLine"
+        v-model:font-size="fontSize"
+        v-model:line-playback-mode="linePlaybackMode"
+        v-model:reading-palette="readingPalette"
+        v-model:show-settings="showSettings"
+        v-model:speech-rate="speechRate"
+        :active-flow="activeFlow"
+        :active-word-style="activeWordStyle"
+        :audio-issues="audioIssues"
+        :computed-line-font-size="computedLineFontSize"
+        :computed-word-context-font-size="computedWordContextFontSize"
+        :current-line-index="currentLineIndex"
+        :current-lines="currentLines"
+        :current-text-mode="currentTextMode"
+        :current-word-index="currentWordIndex"
+        :current-words="currentWords"
+        :expected-reading-text="expectedReadingText"
+        :has-spoken-text="hasSpokenText"
+        :is-fullscreen="isFullscreen"
+        :is-playing-words="isPlayingWords"
+        :is-speaking-line="isSpeakingLine"
+        :line-progress-percent="lineProgressPercent"
+        :palette-styles="paletteStyles"
+        :reading-mode="readingMode"
+        :spoken-text="spokenText"
+        :spoken-transcription="spokenTranscription"
+        :word-audio-mode="wordAudioMode"
+        @next-line="nextLine"
+        @next-word="nextWord"
+        @open-validation="openValidation = true"
+        @prev-line="prevLine"
+        @prev-word="prevWord"
+        @reset-all="resetAll"
+        @restart-reading="restartReading"
+        @set-reading-mode="setReadingMode"
+        @set-word-audio-mode="setWordAudioMode"
+        @speak-text="speakTextAndWait"
+        @stop-all-audio="stopAllAudio"
+        @switch-text-mode="switchTextMode"
+        @toggle-fullscreen="toggleFullscreen"
+        @toggle-line-reading="toggleLineReading"
+        @toggle-word-play="toggleWordPlay"
+      />
     </main>
 
     <input ref="imageInput" type="file" accept="image/*" hidden @change="onImageChange" />
@@ -519,8 +132,18 @@ import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { Camera, CameraResultType, CameraSource } from '@capacitor/camera'
 import { createInferenceService } from './services/inference/createInferenceService'
 import { Capacitor } from '@capacitor/core'
+import { useRoute, useRouter } from 'vue-router'
+import { routeScreenNames } from './router'
+import AudioPrepareView from './views/AudioPrepareView.vue'
+import HomeView from './views/HomeView.vue'
+import ImageConfirmView from './views/ImageConfirmView.vue'
+import ImageSourceView from './views/ImageSourceView.vue'
+import ProcessingView from './views/ProcessingView.vue'
+import ReaderView from './views/ReaderView.vue'
 
 const inference = createInferenceService()
+const route = useRoute()
+const router = useRouter()
 
 let warmed = false
 
@@ -557,11 +180,26 @@ const showSettings = ref(true)
 const isFullscreen = ref(false)
 const isLandscape = ref(false)
 
+function setScreen(nextScreen) {
+  const safeScreen = routeScreenNames.includes(nextScreen) ? nextScreen : 'home'
+  screen.value = safeScreen
+
+  if (route.name !== safeScreen) {
+    router.push({ name: safeScreen }).catch(() => { })
+  }
+}
+
+watch(() => route.name, (routeName) => {
+  if (routeScreenNames.includes(routeName) && screen.value !== routeName) {
+    screen.value = routeName
+  }
+}, { immediate: true })
+
 const imageInput = ref(null)
 const audioInput = ref(null)
 
 const readingPalette = ref('yellow')
-const fontSize = ref(30)
+const fontSize = ref(24)
 const readingMode = ref('line')
 const currentTextMode = ref('simplified')
 const wordAudioMode = ref('silent')
@@ -578,6 +216,9 @@ const speechRate = ref(1.0)
 const processingProgress = ref(0)
 const processingMessage = ref('A preparar...')
 const processingTitle = ref('A preparar a leitura')
+
+const imageOptimizationMaxEdge = 900
+const imageOptimizationQuality = 0.72
 
 let playTimer = null
 let wordPlaybackStopped = false
@@ -615,10 +256,10 @@ const validationText = computed(() => {
 
 const paletteStyles = computed(() => {
   const palettes = {
-    yellow: { lineText: '#FFFFFF', inactiveWord: 'rgba(255,255,255,0.84)', activeBg: 'rgba(255, 214, 53, 0.95)', activeText: '#231900' },
-    blue: { lineText: '#F8FBFF', inactiveWord: 'rgba(248, 251, 255, 0.72)', activeBg: '#8FD3FF', activeText: '#0B1F2A' },
-    green: { lineText: '#F7FFF8', inactiveWord: 'rgba(247, 255, 248, 0.72)', activeBg: '#9BE7B1', activeText: '#102217' },
-    pink: { lineText: '#FFF8FC', inactiveWord: 'rgba(255, 248, 252, 0.72)', activeBg: '#FFB8D2', activeText: '#32111F' }
+    yellow: { lineText: '#FFFFFF', inactiveWord: '#172033', activeBg: 'rgba(255, 214, 53, 0.95)', activeText: '#231900' },
+    blue: { lineText: '#F8FBFF', inactiveWord: '#172033', activeBg: '#8FD3FF', activeText: '#0B1F2A' },
+    green: { lineText: '#F7FFF8', inactiveWord: '#172033', activeBg: '#9BE7B1', activeText: '#102217' },
+    pink: { lineText: '#FFF8FC', inactiveWord: '#172033', activeBg: '#FFB8D2', activeText: '#32111F' }
   }
   return palettes[readingPalette.value] || palettes.yellow
 })
@@ -628,9 +269,9 @@ const lineProgressPercent = computed(() => {
   return ((currentLineIndex.value + 1) / currentLines.value.length) * 100
 })
 
-const computedLineFontSize = computed(() => isLandscape.value ? Math.max(22, Math.min(fontSize.value - 2, 34)) : fontSize.value)
-const computedWordContextFontSize = computed(() => isLandscape.value ? Math.max(18, Math.min(fontSize.value - 8, 28)) : Math.max(20, fontSize.value - 6))
-const activeWordStyle = computed(() => isLandscape.value ? { fontSize: '1.25em', transform: 'translateY(-1px)' } : { fontSize: '1.4em', transform: 'translateY(-2px)' })
+const computedLineFontSize = computed(() => isLandscape.value ? Math.max(18, Math.min(fontSize.value - 4, 24)) : Math.max(20, Math.min(fontSize.value, 26)))
+const computedWordContextFontSize = computed(() => isLandscape.value ? Math.max(15, Math.min(fontSize.value - 8, 19)) : Math.max(18, Math.min(fontSize.value - 5, 22)))
+const activeWordStyle = computed(() => isLandscape.value ? { fontSize: '1.08em', transform: 'translateY(-1px)' } : { fontSize: '1.24em', transform: 'translateY(-1px)' })
 
 watch(currentLineIndex, () => { currentWordIndex.value = 0 })
 watch(readingMode, () => {
@@ -663,18 +304,72 @@ function startImageFlow() {
   selectedImageMimeType.value = 'image/jpeg'
   if (previewUrl.value) URL.revokeObjectURL(previewUrl.value)
   previewUrl.value = ''
-  screen.value = 'select-image-source'
+  setScreen('select-image-source')
 }
 
-function setSelectedImageFromDataUrl(dataUrl, mimeType = 'image/jpeg') {
-  selectedImageBase64.value = dataUrl
-  selectedImageMimeType.value = mimeType || 'image/jpeg'
+async function setSelectedImageFromDataUrl(dataUrl, mimeType = 'image/jpeg') {
+  const preparedImage = await optimizeImageForInference(dataUrl)
+
+  selectedImageBase64.value = preparedImage.dataUrl
+  selectedImageMimeType.value = preparedImage.mimeType
 
   if (previewUrl.value) URL.revokeObjectURL(previewUrl.value)
-  previewUrl.value = dataUrl
+  previewUrl.value = preparedImage.dataUrl
 
   selectedFile.value = { name: 'imagem-selecionada', type: selectedImageMimeType.value }
-  screen.value = 'confirm-image'
+  setScreen('confirm-image')
+}
+
+function optimizeImageForInference(dataUrl) {
+  return new Promise((resolve) => {
+    const image = new Image()
+
+    image.onload = () => {
+      const sourceWidth = image.naturalWidth || image.width
+      const sourceHeight = image.naturalHeight || image.height
+
+      if (!sourceWidth || !sourceHeight) {
+        resolve({ dataUrl, mimeType: 'image/jpeg' })
+        return
+      }
+
+      const scale = Math.min(1, imageOptimizationMaxEdge / Math.max(sourceWidth, sourceHeight))
+      const targetWidth = Math.max(1, Math.round(sourceWidth * scale))
+      const targetHeight = Math.max(1, Math.round(sourceHeight * scale))
+
+      const canvas = document.createElement('canvas')
+      canvas.width = targetWidth
+      canvas.height = targetHeight
+
+      const context = canvas.getContext('2d', { alpha: false })
+      if (!context) {
+        resolve({ dataUrl, mimeType: 'image/jpeg' })
+        return
+      }
+
+      context.fillStyle = '#ffffff'
+      context.fillRect(0, 0, targetWidth, targetHeight)
+      context.drawImage(image, 0, 0, targetWidth, targetHeight)
+
+      const optimizedDataUrl = canvas.toDataURL('image/jpeg', imageOptimizationQuality)
+
+      console.log('[DyslexAI] Imagem otimizada para inferência:', {
+        originalSize: dataUrl.length,
+        optimizedSize: optimizedDataUrl.length,
+        originalDimensions: `${sourceWidth}x${sourceHeight}`,
+        optimizedDimensions: `${targetWidth}x${targetHeight}`,
+      })
+
+      resolve({ dataUrl: optimizedDataUrl, mimeType: 'image/jpeg' })
+    }
+
+    image.onerror = () => {
+      console.warn('[DyslexAI] Não foi possível otimizar a imagem; será usada a imagem original.')
+      resolve({ dataUrl, mimeType: 'image/jpeg' })
+    }
+
+    image.src = dataUrl
+  })
 }
 
 async function takePhoto() {
@@ -690,7 +385,7 @@ async function takePhoto() {
     if (!image.dataUrl) throw new Error('A fotografia não devolveu dados.')
 
     const mimeType = `image/${image.format || 'jpeg'}`
-    setSelectedImageFromDataUrl(image.dataUrl, mimeType)
+    await setSelectedImageFromDataUrl(image.dataUrl, mimeType)
   } catch (error) {
     console.error('[DyslexAI] Erro ao tirar fotografia:', error)
     if (error?.message !== 'User cancelled photos app') {
@@ -712,7 +407,7 @@ async function pickFromGallery() {
     if (!image.dataUrl) throw new Error('A imagem não devolveu dados.')
 
     const mimeType = `image/${image.format || 'jpeg'}`
-    setSelectedImageFromDataUrl(image.dataUrl, mimeType)
+    await setSelectedImageFromDataUrl(image.dataUrl, mimeType)
   } catch (error) {
     console.error('[DyslexAI] Erro ao escolher imagem:', error)
     if (error?.message !== 'User cancelled photos app') {
@@ -728,7 +423,7 @@ async function startAudioFlow() {
   spokenText.value = ''
   spokenTranscription.value = ''
   expectedReadingText.value = ''
-  screen.value = 'confirm-audio'
+  setScreen('confirm-audio')
 
   try {
     await generateReadingPhrase()
@@ -976,7 +671,7 @@ async function onImageChange(event) {
     selectedImageMimeType.value = file.type || 'image/jpeg'
 
     const dataUrl = await readFileAsDataUrl(file)
-    setSelectedImageFromDataUrl(dataUrl, selectedImageMimeType.value)
+    await setSelectedImageFromDataUrl(dataUrl, selectedImageMimeType.value)
   } catch (error) {
     console.error('[DyslexAI] Erro ao ler imagem selecionada:', error)
     alert('Não foi possível ler a imagem selecionada.')
@@ -995,7 +690,7 @@ function onAudioChange(event) {
   selectedAudioFile.value = file
   selectedAudioName.value = file.name
   audioPreviewUrl.value = URL.createObjectURL(file)
-  screen.value = 'confirm-audio'
+  setScreen('confirm-audio')
 }
 
 async function processRealImage() {
@@ -1135,7 +830,7 @@ async function processImage() {
   }
 
   try {
-    screen.value = 'processing'
+    setScreen('processing')
     processingTitle.value = 'A preparar a leitura'
     processingProgress.value = 15
     processingMessage.value = 'A enviar imagem...'
@@ -1149,7 +844,7 @@ async function processImage() {
   } catch (error) {
     console.error(error)
     alert(error.message || 'Ocorreu um erro ao processar a imagem.')
-    screen.value = 'confirm-image'
+    setScreen('confirm-image')
   }
 }
 
@@ -1164,7 +859,7 @@ async function processAudio() {
   }
 
   try {
-    screen.value = 'processing'
+    setScreen('processing')
     processingTitle.value = 'A preparar a leitura a partir da fala'
     processingProgress.value = 15
     processingMessage.value = 'A enviar áudio...'
@@ -1178,7 +873,7 @@ async function processAudio() {
   } catch (error) {
     console.error(error)
     alert(error.message || 'Ocorreu um erro ao processar o áudio.')
-    screen.value = 'confirm-audio'
+    setScreen('confirm-audio')
   }
 }
 
@@ -1208,12 +903,12 @@ function enterReader(defaultTextMode = 'simplified') {
   currentLineIndex.value = 0
   currentWordIndex.value = 0
   openValidation.value = false
-  screen.value = 'reader'
+  setScreen('reader')
 }
 
 function goHome() {
   stopAllAudio()
-  screen.value = 'home'
+  setScreen('home')
 }
 
 function switchTextMode(mode) {
@@ -1451,7 +1146,7 @@ function clearPreviewUrls() {
 function resetAll() {
   stopAllAudio()
   clearPreviewUrls()
-  screen.value = 'home'
+  setScreen('home')
   activeFlow.value = 'image'
   selectedFile.value = null
   selectedImageBase64.value = ''
@@ -1501,8 +1196,8 @@ onBeforeUnmount(() => {
 })
 </script>
 
-<style scoped>
-:global(body) {
+<style>
+body {
   margin: 0;
   font-family: Inter, system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
   color: #111827;
@@ -2648,8 +2343,8 @@ audio {
    DyslexAI Android UI — proposta aprovada (Google clean)
    Apenas camada visual. Não altera backend, inferência ou Capacitor.
    ========================================================= */
-:global(html), :global(body), :global(#app) { width:100%; min-width:0; min-height:100%; overflow-x:hidden; background:#f6f8fc; }
-:global(body) { margin:0; font-family:Inter, Roboto, system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; color:#0f172a; -webkit-font-smoothing:antialiased; }
+html, body, #app { width:100%; min-width:0; min-height:100%; overflow-x:hidden; background:#f6f8fc; }
+body { margin:0; font-family:Inter, Roboto, system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; color:#0f172a; -webkit-font-smoothing:antialiased; }
 .player-app { width:100%; min-height:100dvh; background:linear-gradient(180deg,#f8fbff 0%,#eef3f8 100%); overflow-x:hidden; }
 .app-shell { width:100%; max-width:none; min-height:100dvh; margin:0; padding:max(10px, env(safe-area-inset-top)) max(14px, env(safe-area-inset-right)) max(10px, env(safe-area-inset-bottom)) max(14px, env(safe-area-inset-left)); }
 .screen-center { width:100%; min-height:calc(100dvh - 20px); display:grid; place-items:center; overflow:hidden; }
@@ -2768,8 +2463,8 @@ button, select, input, textarea, audio { font:inherit; }
 /* =========================================================
    AJUSTE FINAL — Home vertical/horizontal
    ========================================================= */
-:global(html), :global(body), :global(#app) { width:100%; height:100%; min-width:0; margin:0; overflow:hidden; background:#f7faff; }
-:global(*) { box-sizing:border-box; }
+html, body, #app { width:100%; height:100%; min-width:0; margin:0; overflow:hidden; background:#f7faff; }
+* { box-sizing:border-box; }
 .player-app,.app-shell,.home-screen { width:100vw; height:100dvh; min-height:100dvh; max-width:100vw; overflow:hidden; margin:0; }
 .player-app { background:#f7faff; color:#14213d; }
 .app-shell { padding:0; }
@@ -2841,14 +2536,14 @@ button, select, input, textarea, audio { font:inherit; }
    AJUSTE HOME V3 — vertical primeiro, horizontal controlado
    Mantém lógica; corrige proporções, ícone, cores e espaços.
    ========================================================= */
-:global(html), :global(body), :global(#app) {
+html, body, #app {
   width: 100% !important;
   height: 100% !important;
   margin: 0 !important;
   overflow: hidden !important;
   background: #ffffff !important;
 }
-:global(*) { box-sizing: border-box; }
+* { box-sizing: border-box; }
 
 .player-app,
 .app-shell,
@@ -3755,9 +3450,9 @@ button, select, input, textarea, audio { font:inherit; }
 }
 
 /* ===== HOME TARGET — layout da referência final ===== */
-:global(html),
-:global(body),
-:global(#app) {
+html,
+body,
+#app {
   background: #f6f8fc !important;
 }
 
@@ -5917,7 +5612,7 @@ button, select, input, textarea, audio { font:inherit; }
     align-self: stretch !important;
     display: grid !important;
     grid-template-columns: 1fr !important;
-    grid-template-rows: minmax(0, 1fr) auto !important;
+    grid-template-rows: minmax(0, 1fr) 74px !important;
     gap: 10px !important;
     padding: 12px !important;
   }
@@ -6283,7 +5978,7 @@ button, select, input, textarea, audio { font:inherit; }
     min-height: 64px !important;
     height: 64px !important;
     display: grid !important;
-    grid-template-columns: minmax(0, 1fr) minmax(420px, 1.15fr) !important;
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) !important;
     column-gap: 18px !important;
     align-items: center !important;
     padding: 8px 14px !important;
@@ -6310,6 +6005,7 @@ button, select, input, textarea, audio { font:inherit; }
     grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
     gap: 8px !important;
     align-items: center !important;
+    justify-self: stretch !important;
   }
 
   .review-home .review-action-row button {
@@ -6317,5 +6013,1466 @@ button, select, input, textarea, audio { font:inherit; }
     padding: 6px 10px !important;
     font-size: clamp(.68rem, .95vw, .82rem) !important;
   }
+}
+
+@media (orientation: landscape), (max-height: 620px) and (min-width: 520px) {
+  .review-home .review-action-card {
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) !important;
+  }
+
+  .review-home .confirm-text {
+    grid-column: 1 !important;
+    justify-self: stretch !important;
+    text-align: left !important;
+  }
+
+  .review-home .review-action-row {
+    grid-column: 2 !important;
+    justify-self: stretch !important;
+    grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+  }
+}
+
+/* ===== REVIEW HEADER FINAL — igual ao ecrã de fala em horizontal ===== */
+@media (orientation: landscape), (max-height: 620px) and (min-width: 520px) {
+  .review-home {
+    position: relative !important;
+  }
+
+  .review-home .google-home-header {
+    min-height: 70px !important;
+  }
+
+  .review-home .review-intro-panel {
+    position: absolute !important;
+    top: max(18px, env(safe-area-inset-top)) !important;
+    left: clamp(360px, 34vw, 500px) !important;
+    right: clamp(70px, 6vw, 108px) !important;
+    z-index: 4 !important;
+    display: grid !important;
+    grid-template-columns: minmax(0, 1fr) !important;
+    row-gap: 3px !important;
+    align-items: start !important;
+    width: auto !important;
+    max-width: none !important;
+    min-height: 0 !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    transform: none !important;
+    pointer-events: none !important;
+  }
+
+  .review-home .review-intro-panel h1 {
+    grid-column: 1 !important;
+    max-width: none !important;
+    font-size: clamp(1rem, 1.45vw, 1.24rem) !important;
+    line-height: 1.08 !important;
+    white-space: nowrap !important;
+    margin: 0 !important;
+  }
+
+  .review-home .review-intro-panel p {
+    grid-column: 1 !important;
+    max-width: 38ch !important;
+    font-size: clamp(.68rem, .9vw, .82rem) !important;
+    line-height: 1.15 !important;
+    white-space: normal !important;
+    margin: 0 !important;
+  }
+}
+
+/* ===== PORTRAIT ACTION SPLIT — duas caixas a ocupar a area util ===== */
+@media (orientation: portrait) {
+  .google-home-main {
+    grid-template-rows: auto minmax(0, 1fr) !important;
+    align-content: stretch !important;
+  }
+
+  .home-actions-panel,
+  .assisted-home .assisted-actions-panel {
+    height: 100% !important;
+    min-height: 0 !important;
+    align-content: stretch !important;
+    grid-template-rows: repeat(2, minmax(0, 1fr)) !important;
+  }
+
+  .home-option-card,
+  .assisted-home .assisted-option-card {
+    min-height: 0 !important;
+    height: 100% !important;
+    grid-template-columns: clamp(58px, 18vw, 82px) minmax(0, 1fr) clamp(32px, 9vw, 40px) !important;
+    gap: clamp(9px, 3vw, 13px) !important;
+    padding: clamp(10px, 2.3vh, 14px) !important;
+    border-radius: 18px !important;
+  }
+
+  .home-option-icon,
+  .assisted-home .assisted-option-icon {
+    width: clamp(58px, 18vw, 82px) !important;
+    height: clamp(58px, 18vw, 82px) !important;
+    min-width: clamp(58px, 18vw, 82px) !important;
+  }
+
+  .home-option-arrow {
+    width: clamp(32px, 9vw, 40px) !important;
+    height: clamp(32px, 9vw, 40px) !important;
+    min-width: clamp(32px, 9vw, 40px) !important;
+    font-size: clamp(1.05rem, 4vw, 1.28rem) !important;
+  }
+
+  .home-option-text {
+    gap: 4px !important;
+  }
+
+  .home-option-text strong {
+    font-size: clamp(.96rem, 4vw, 1.16rem) !important;
+    line-height: 1.12 !important;
+    letter-spacing: 0 !important;
+  }
+
+  .home-option-text span {
+    font-size: clamp(.72rem, 3vw, .86rem) !important;
+    line-height: 1.24 !important;
+  }
+}
+
+@media (orientation: portrait) and (max-height: 700px) {
+  .google-home-main {
+    gap: 10px !important;
+    padding-top: 4px !important;
+    padding-bottom: 6px !important;
+  }
+
+  .home-actions-panel,
+  .assisted-home .assisted-actions-panel {
+    gap: 9px !important;
+  }
+
+  .home-option-card,
+  .assisted-home .assisted-option-card {
+    grid-template-columns: clamp(50px, 15vw, 68px) minmax(0, 1fr) 32px !important;
+    padding: 9px 10px !important;
+  }
+
+  .home-option-icon,
+  .assisted-home .assisted-option-icon {
+    width: clamp(50px, 15vw, 68px) !important;
+    height: clamp(50px, 15vw, 68px) !important;
+    min-width: clamp(50px, 15vw, 68px) !important;
+  }
+
+  .home-option-text strong {
+    font-size: clamp(.88rem, 3.5vw, 1.04rem) !important;
+  }
+
+  .home-option-text span {
+    font-size: clamp(.66rem, 2.55vw, .78rem) !important;
+  }
+}
+
+/* ===== ANDROID PORTRAIT FINAL FIT ===== */
+@media (orientation: portrait) {
+  .home-intro-panel h1,
+  .assisted-home .assisted-intro-panel h1,
+  .speech-home .speech-intro-panel h1,
+  .review-intro-panel h1,
+  .review-home .review-intro-panel h1 {
+    max-width: 18ch !important;
+    font-size: clamp(1.18rem, 4.4vw, 1.46rem) !important;
+    line-height: 1.12 !important;
+    letter-spacing: 0 !important;
+  }
+
+  .home-intro-panel p,
+  .assisted-home .assisted-intro-panel p,
+  .speech-home .speech-intro-panel p,
+  .review-intro-panel p,
+  .review-home .review-intro-panel p {
+    max-width: 42ch !important;
+    font-size: clamp(.72rem, 2.7vw, .84rem) !important;
+    line-height: 1.24 !important;
+  }
+
+  .speech-home .google-home-main {
+    grid-template-rows: auto minmax(0, 1fr) !important;
+    gap: 8px !important;
+    padding: 4px clamp(14px, 4vw, 20px) 6px !important;
+    overflow: hidden !important;
+  }
+
+  .speech-home .speech-intro-panel {
+    min-height: 0 !important;
+    gap: 4px 8px !important;
+  }
+
+  .speech-work-panel {
+    height: 100% !important;
+    min-height: 0 !important;
+    overflow: hidden !important;
+    align-content: stretch !important;
+    gap: 7px !important;
+    grid-template-rows: auto minmax(110px, 1.35fr) minmax(38px, .38fr) auto !important;
+  }
+
+  .speech-config-card,
+  .speech-phrase-card,
+  .speech-record-card,
+  .speech-record-controls {
+    min-height: 0 !important;
+    padding: 8px 10px !important;
+    border-radius: 12px !important;
+  }
+
+  .speech-config-grid {
+    gap: 6px !important;
+  }
+
+  .speech-config-grid label {
+    gap: 3px !important;
+    font-size: .68rem !important;
+  }
+
+  .speech-config-grid select {
+    min-height: 30px !important;
+    padding: 4px 8px !important;
+    border-radius: 9px !important;
+    font-size: .78rem !important;
+  }
+
+  .speech-button-row {
+    margin-top: 6px !important;
+    gap: 6px !important;
+  }
+
+  .speech-button-row .soft-action,
+  .speech-record-controls button {
+    min-height: 36px !important;
+    padding: 7px 8px !important;
+    font-size: .8rem !important;
+  }
+
+  .speech-phrase-card {
+    align-content: center !important;
+    gap: 4px !important;
+    min-height: 96px !important;
+  }
+
+  .speech-phrase-card strong {
+    font-size: clamp(.84rem, 3.2vw, .96rem) !important;
+    line-height: 1.16 !important;
+  }
+
+  .speech-record-card {
+    grid-template-columns: 32px minmax(0, 1fr) !important;
+    gap: 7px !important;
+    align-items: center !important;
+    overflow: hidden !important;
+    min-height: 38px !important;
+  }
+
+  .speech-record-icon {
+    width: 32px !important;
+    height: 32px !important;
+    border-radius: 9px !important;
+  }
+
+  .speech-record-copy {
+    min-height: 0 !important;
+    gap: 3px !important;
+    overflow: hidden !important;
+  }
+
+  .speech-home .status-pill {
+    min-height: 24px !important;
+    width: fit-content !important;
+    max-width: 100% !important;
+    padding: 3px 9px !important;
+    font-size: .7rem !important;
+    line-height: 1.1 !important;
+  }
+
+  .speech-home .status-file {
+    max-width: 100% !important;
+    overflow: hidden !important;
+    text-overflow: ellipsis !important;
+    white-space: nowrap !important;
+    font-size: .68rem !important;
+    line-height: 1.1 !important;
+  }
+
+  .speech-home .audio-player {
+    width: 100% !important;
+    height: 30px !important;
+    max-height: 30px !important;
+  }
+
+  .speech-record-controls {
+    display: grid !important;
+    grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+    gap: 6px !important;
+  }
+}
+
+@media (orientation: portrait) and (max-height: 700px) {
+  .speech-home .google-home-header {
+    padding-top: max(6px, env(safe-area-inset-top)) !important;
+    padding-bottom: 0 !important;
+  }
+
+  .speech-home .google-home-main {
+    gap: 6px !important;
+    padding-top: 2px !important;
+    padding-bottom: 4px !important;
+  }
+
+  .speech-work-panel {
+    gap: 5px !important;
+    grid-template-rows: auto minmax(96px, 1.25fr) minmax(34px, .34fr) auto !important;
+  }
+
+  .speech-config-card,
+  .speech-phrase-card,
+  .speech-record-card,
+  .speech-record-controls {
+    padding: 6px 8px !important;
+  }
+
+  .speech-record-icon {
+    width: 28px !important;
+    height: 28px !important;
+  }
+
+  .speech-record-card {
+    grid-template-columns: 28px minmax(0, 1fr) !important;
+    min-height: 34px !important;
+  }
+
+  .speech-phrase-card {
+    min-height: 82px !important;
+  }
+}
+
+/* ===== SPEECH ANDROID LANDSCAPE FINAL — mesma logica da vertical ===== */
+@media (orientation: landscape) and (min-width: 520px) {
+  .speech-home:not(.review-home) {
+    position: static !important;
+  }
+
+  .speech-home:not(.review-home) .google-home-header {
+    min-height: 0 !important;
+    padding: max(8px, env(safe-area-inset-top)) clamp(18px, 3.2vw, 32px) 2px !important;
+  }
+
+  .speech-home:not(.review-home) .google-home-main {
+    position: static !important;
+    display: grid !important;
+    grid-template-columns: minmax(0, 1fr) !important;
+    grid-template-rows: auto minmax(0, 1fr) !important;
+    align-content: stretch !important;
+    align-items: stretch !important;
+    justify-content: stretch !important;
+    gap: 6px !important;
+    padding: 2px clamp(16px, 3.2vw, 28px) 6px !important;
+    overflow: hidden !important;
+  }
+
+  .speech-home:not(.review-home) .speech-intro-panel {
+    position: static !important;
+    grid-row: 1 !important;
+    width: 100% !important;
+    max-width: none !important;
+    min-height: 0 !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    transform: none !important;
+    pointer-events: auto !important;
+    display: grid !important;
+    grid-template-columns: minmax(0, auto) minmax(0, 1fr) !important;
+    align-items: center !important;
+    column-gap: 12px !important;
+    row-gap: 0 !important;
+  }
+
+  .speech-home:not(.review-home) .speech-intro-panel h1 {
+    grid-column: 1 !important;
+    max-width: none !important;
+    margin: 0 !important;
+    transform: none !important;
+    white-space: nowrap !important;
+    font-size: clamp(.95rem, 1.75vw, 1.16rem) !important;
+    line-height: 1.08 !important;
+    letter-spacing: 0 !important;
+  }
+
+  .speech-home:not(.review-home) .speech-intro-panel p {
+    grid-column: 2 !important;
+    max-width: none !important;
+    margin: 0 !important;
+    transform: none !important;
+    white-space: nowrap !important;
+    overflow: hidden !important;
+    text-overflow: ellipsis !important;
+    font-size: clamp(.66rem, 1.15vw, .78rem) !important;
+    line-height: 1.15 !important;
+  }
+
+  .speech-home:not(.review-home) .speech-work-panel {
+    grid-row: 2 !important;
+    width: 100% !important;
+    max-width: none !important;
+    height: 100% !important;
+    min-height: 0 !important;
+    justify-self: stretch !important;
+    align-self: stretch !important;
+    transform: none !important;
+    overflow: hidden !important;
+    display: grid !important;
+    grid-template-columns: minmax(220px, .95fr) minmax(260px, 1.05fr) !important;
+    grid-template-rows: minmax(0, 1fr) 64px !important;
+    gap: 7px !important;
+    align-content: stretch !important;
+  }
+
+  .speech-home:not(.review-home) .speech-config-card {
+    grid-column: 1 !important;
+    grid-row: 1 !important;
+  }
+
+  .speech-home:not(.review-home) .speech-phrase-card,
+  .speech-home:not(.review-home) .speech-record-card {
+    grid-column: 2 !important;
+  }
+
+  .speech-home:not(.review-home) .speech-phrase-card {
+    grid-row: 1 !important;
+    align-self: start !important;
+    min-height: 66px !important;
+  }
+
+  .speech-home:not(.review-home) .speech-record-card {
+    grid-row: 1 !important;
+    align-self: end !important;
+    min-height: 74px !important;
+  }
+
+  .speech-home:not(.review-home) .speech-record-controls {
+    grid-column: 1 / -1 !important;
+    grid-row: 2 !important;
+    display: grid !important;
+    grid-template-columns: repeat(4, minmax(0, 1fr)) !important;
+    gap: 7px !important;
+  }
+
+  .speech-home:not(.review-home) .speech-config-card,
+  .speech-home:not(.review-home) .speech-phrase-card,
+  .speech-home:not(.review-home) .speech-record-card,
+  .speech-home:not(.review-home) .speech-record-controls {
+    min-height: 0 !important;
+    padding: 7px 9px !important;
+    border-radius: 12px !important;
+  }
+
+  .speech-home:not(.review-home) .speech-config-grid {
+    gap: 5px !important;
+  }
+
+  .speech-home:not(.review-home) .speech-config-grid label {
+    gap: 2px !important;
+    font-size: .66rem !important;
+  }
+
+  .speech-home:not(.review-home) .speech-config-grid select {
+    min-height: 28px !important;
+    padding: 3px 8px !important;
+    font-size: .76rem !important;
+  }
+
+  .speech-home:not(.review-home) .speech-button-row {
+    margin-top: 5px !important;
+    gap: 6px !important;
+  }
+
+  .speech-home:not(.review-home) .speech-button-row .soft-action,
+  .speech-home:not(.review-home) .speech-record-controls button {
+    min-height: 34px !important;
+    padding: 6px 8px !important;
+    font-size: .78rem !important;
+  }
+
+  .speech-home:not(.review-home) .speech-phrase-card strong {
+    font-size: clamp(.78rem, 1.45vw, .94rem) !important;
+    line-height: 1.14 !important;
+  }
+
+  .speech-home:not(.review-home) .speech-record-card {
+    grid-template-columns: 40px minmax(0, 1fr) !important;
+    gap: 7px !important;
+    overflow: hidden !important;
+  }
+
+  .speech-home:not(.review-home) .speech-record-icon {
+    width: 40px !important;
+    height: 40px !important;
+    border-radius: 10px !important;
+  }
+
+  .speech-home:not(.review-home) .speech-record-copy {
+    gap: 3px !important;
+    overflow: hidden !important;
+  }
+
+  .speech-home:not(.review-home) .status-pill {
+    min-height: 26px !important;
+    width: fit-content !important;
+    max-width: 100% !important;
+    padding: 4px 9px !important;
+    font-size: .72rem !important;
+    line-height: 1.1 !important;
+  }
+
+  .speech-home:not(.review-home) .status-file {
+    max-width: 100% !important;
+    overflow: hidden !important;
+    text-overflow: ellipsis !important;
+    white-space: nowrap !important;
+    font-size: .66rem !important;
+    line-height: 1.1 !important;
+  }
+
+  .speech-home:not(.review-home) .audio-player {
+    width: 100% !important;
+    height: 28px !important;
+    max-height: 28px !important;
+  }
+}
+
+/* ===== NAVIGATION FINAL — topo com inicio e bottom vazio ===== */
+.header-action-row {
+  display: flex !important;
+  align-items: center !important;
+  justify-content: flex-end !important;
+  gap: 8px !important;
+}
+
+.home-help-btn svg,
+.reader-header-btn svg {
+  width: 18px !important;
+  height: 18px !important;
+  display: block !important;
+}
+
+.home-bottom-nav--empty {
+  display: block !important;
+  width: 100% !important;
+  height: 0 !important;
+  min-height: 0 !important;
+  margin: 0 !important;
+  padding: 0 !important;
+  border: 0 !important;
+  box-shadow: none !important;
+  background: transparent !important;
+  overflow: hidden !important;
+}
+
+/* ===== REVIEW IMAGE BUTTONS FINAL ===== */
+.review-home .review-action-card.speech-record-controls {
+  width: 100% !important;
+  min-width: 0 !important;
+  display: grid !important;
+  grid-template-columns: minmax(0, 1fr) !important;
+  padding: 8px !important;
+}
+
+.review-home .review-action-row {
+  width: 100% !important;
+  min-width: 0 !important;
+  justify-self: stretch !important;
+  display: grid !important;
+  grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+  gap: 8px !important;
+}
+
+.review-home .review-action-row button {
+  width: 100% !important;
+  min-width: 0 !important;
+  min-height: 48px !important;
+  padding: 8px 10px !important;
+  font-size: .82rem !important;
+}
+
+/* ===== READER CONTROLS FINAL ===== */
+.reader-home:not(.speech-result-home) .pill-btn {
+  font-size: .78rem !important;
+  line-height: 1.08 !important;
+}
+
+.reader-home:not(.speech-result-home) .settings-panel {
+  font-size: .78rem !important;
+}
+
+.reader-home:not(.speech-result-home) .setting-block {
+  gap: 5px !important;
+  font-size: .78rem !important;
+  line-height: 1.08 !important;
+}
+
+.reader-home:not(.speech-result-home) .setting-block label {
+  font-size: .78rem !important;
+  line-height: 1.12 !important;
+}
+
+.reader-home:not(.speech-result-home) .setting-block select,
+.reader-home:not(.speech-result-home) .setting-block input {
+  font-size: .78rem !important;
+}
+
+/* ===== TYPOGRAPHY FINAL — mesma escala em todas as orientacoes ===== */
+.google-home .home-brand-title {
+  font-size: clamp(1.12rem, 3.8vw, 1.42rem) !important;
+  line-height: .98 !important;
+  letter-spacing: -0.02em !important;
+  font-weight: 760 !important;
+}
+
+.google-home .home-brand-subtitle,
+.speech-result-home .home-brand-subtitle {
+  margin-top: 2px !important;
+  font-size: clamp(.62rem, 1.9vw, .74rem) !important;
+  line-height: 1.1 !important;
+  color: #6f7b8f !important;
+}
+
+.google-home .home-intro-panel h1,
+.google-home .assisted-intro-panel h1,
+.google-home .speech-intro-panel h1,
+.google-home .review-intro-panel h1 {
+  max-width: 18ch !important;
+  font-size: clamp(1rem, 3.4vw, 1.2rem) !important;
+  line-height: 1.12 !important;
+  letter-spacing: 0 !important;
+}
+
+.google-home .home-intro-panel p,
+.google-home .assisted-intro-panel p,
+.google-home .speech-intro-panel p,
+.google-home .review-intro-panel p {
+  max-width: 42ch !important;
+  font-size: clamp(.62rem, 2vw, .74rem) !important;
+  line-height: 1.24 !important;
+}
+
+.google-home .home-option-text strong,
+.google-home .assisted-option-card .home-option-text strong {
+  font-size: clamp(.82rem, 2.9vw, .98rem) !important;
+  line-height: 1.12 !important;
+  letter-spacing: 0 !important;
+}
+
+.google-home .home-option-text span,
+.google-home .assisted-option-card .home-option-text span {
+  font-size: clamp(.62rem, 2.1vw, .74rem) !important;
+  line-height: 1.24 !important;
+}
+
+/* ===== SPEECH PREP RESTORE — uma coluna, organizado por linhas ===== */
+.speech-home:not(.review-home) .google-home-main {
+  display: grid !important;
+  grid-template-columns: minmax(0, 1fr) !important;
+  grid-template-rows: auto minmax(0, 1fr) !important;
+  align-content: stretch !important;
+  align-items: stretch !important;
+  gap: 10px !important;
+  overflow: hidden !important;
+}
+
+.speech-home:not(.review-home) .speech-intro-panel {
+  position: static !important;
+  width: 100% !important;
+  max-width: none !important;
+  min-height: 0 !important;
+  margin: 0 !important;
+  padding: 0 !important;
+  transform: none !important;
+  pointer-events: auto !important;
+  display: grid !important;
+  grid-template-columns: minmax(0, 1fr) !important;
+  gap: 4px !important;
+  align-items: start !important;
+}
+
+.speech-home:not(.review-home) .speech-intro-panel h1 {
+  grid-column: 1 !important;
+  max-width: 18ch !important;
+  margin: 0 !important;
+  transform: none !important;
+  white-space: normal !important;
+  font-size: clamp(1.18rem, 4.4vw, 1.46rem) !important;
+  line-height: 1.12 !important;
+  letter-spacing: 0 !important;
+}
+
+.speech-home:not(.review-home) .speech-intro-panel p {
+  grid-column: 1 !important;
+  max-width: 42ch !important;
+  margin: 0 !important;
+  transform: none !important;
+  white-space: normal !important;
+  overflow: visible !important;
+  text-overflow: clip !important;
+  font-size: clamp(.72rem, 2.7vw, .84rem) !important;
+  line-height: 1.24 !important;
+}
+
+.speech-home:not(.review-home) .speech-work-panel {
+  width: 100% !important;
+  max-width: none !important;
+  height: 100% !important;
+  min-height: 0 !important;
+  justify-self: stretch !important;
+  align-self: stretch !important;
+  transform: none !important;
+  overflow: hidden !important;
+  display: grid !important;
+  grid-template-columns: minmax(0, 1fr) !important;
+  grid-template-rows: auto minmax(58px, .7fr) minmax(72px, .85fr) auto !important;
+  gap: 7px !important;
+  align-content: stretch !important;
+}
+
+.speech-home:not(.review-home) .speech-config-card,
+.speech-home:not(.review-home) .speech-phrase-card,
+.speech-home:not(.review-home) .speech-record-card,
+.speech-home:not(.review-home) .speech-record-controls {
+  grid-column: 1 !important;
+  grid-row: auto !important;
+  min-height: 0 !important;
+}
+
+@media (orientation: landscape) and (min-width: 520px) {
+  .speech-home:not(.review-home) .google-home-header {
+    min-height: 0 !important;
+    padding: max(8px, env(safe-area-inset-top)) clamp(18px, 3.2vw, 32px) 2px !important;
+  }
+
+  .speech-home:not(.review-home) .google-home-main {
+    gap: 6px !important;
+    padding: 2px clamp(16px, 3.2vw, 28px) 6px !important;
+  }
+
+  .speech-home:not(.review-home) .speech-intro-panel {
+    gap: 2px !important;
+  }
+
+  .speech-home:not(.review-home) .speech-intro-panel h1 {
+    font-size: clamp(1rem, 1.45vw, 1.24rem) !important;
+    line-height: 1.08 !important;
+  }
+
+  .speech-home:not(.review-home) .speech-intro-panel p {
+    font-size: clamp(.68rem, .9vw, .82rem) !important;
+    line-height: 1.15 !important;
+  }
+
+  .speech-home:not(.review-home) .speech-work-panel {
+    grid-template-rows: auto minmax(48px, .62fr) minmax(58px, .7fr) auto !important;
+    gap: 5px !important;
+  }
+
+  .speech-home:not(.review-home) .speech-record-controls {
+    grid-template-columns: repeat(4, minmax(0, 1fr)) !important;
+  }
+}
+
+/* ===== SPEECH PREP LANDSCAPE TARGET — titulo no topo e conteudo em duas colunas ===== */
+@media (orientation: landscape) and (min-width: 520px) {
+  .speech-home:not(.review-home) .google-home-main {
+    display: grid !important;
+    grid-template-columns: minmax(0, 1fr) !important;
+    grid-template-rows: auto minmax(0, 1fr) !important;
+    align-content: stretch !important;
+    align-items: stretch !important;
+    gap: 8px !important;
+    padding: 4px clamp(28px, 6vw, 70px) 8px !important;
+    overflow: hidden !important;
+  }
+
+  .speech-home:not(.review-home) .speech-intro-panel {
+    grid-row: 1 !important;
+    width: min(100%, 1080px) !important;
+    max-width: 1080px !important;
+    justify-self: center !important;
+    position: static !important;
+    transform: none !important;
+    display: grid !important;
+    grid-template-columns: minmax(0, 1fr) !important;
+    align-items: start !important;
+    column-gap: 0 !important;
+    row-gap: 2px !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    pointer-events: auto !important;
+  }
+
+  .speech-home:not(.review-home) .speech-intro-panel h1 {
+    grid-column: 1 !important;
+    justify-self: start !important;
+    max-width: none !important;
+    margin: 0 !important;
+    white-space: nowrap !important;
+    font-size: clamp(1rem, 1.45vw, 1.24rem) !important;
+    line-height: 1.08 !important;
+    font-weight: 760 !important;
+    letter-spacing: 0 !important;
+  }
+
+  .speech-home:not(.review-home) .speech-intro-panel p {
+    grid-column: 1 !important;
+    justify-self: start !important;
+    max-width: 52ch !important;
+    margin: 0 !important;
+    white-space: nowrap !important;
+    overflow: hidden !important;
+    text-overflow: ellipsis !important;
+    text-align: left !important;
+    font-size: clamp(.68rem, .9vw, .82rem) !important;
+    line-height: 1.15 !important;
+  }
+
+  .speech-home:not(.review-home) .speech-work-panel {
+    grid-row: 2 !important;
+    width: min(100%, 1080px) !important;
+    max-width: 1080px !important;
+    height: 100% !important;
+    min-height: 0 !important;
+    justify-self: center !important;
+    align-self: stretch !important;
+    transform: none !important;
+    overflow: hidden !important;
+    display: grid !important;
+    grid-template-columns: minmax(280px, .95fr) minmax(320px, 1.05fr) !important;
+    grid-template-rows: minmax(0, 1fr) auto !important;
+    gap: 10px !important;
+    align-content: stretch !important;
+  }
+
+  .speech-home:not(.review-home) .speech-config-card {
+    grid-column: 1 !important;
+    grid-row: 1 !important;
+    align-self: stretch !important;
+  }
+
+  .speech-home:not(.review-home) .speech-phrase-card {
+    grid-column: 2 !important;
+    grid-row: 1 !important;
+    align-self: start !important;
+    min-height: 0 !important;
+    height: calc(50% - 5px) !important;
+  }
+
+  .speech-home:not(.review-home) .speech-record-card {
+    grid-column: 2 !important;
+    grid-row: 1 !important;
+    align-self: end !important;
+    min-height: 0 !important;
+    height: calc(50% - 5px) !important;
+  }
+
+  .speech-home:not(.review-home) .speech-record-controls {
+    grid-column: 1 / -1 !important;
+    grid-row: 2 !important;
+    display: grid !important;
+    grid-template-columns: repeat(4, minmax(0, 1fr)) !important;
+    gap: 8px !important;
+  }
+
+  .speech-home:not(.review-home) .speech-config-card,
+  .speech-home:not(.review-home) .speech-phrase-card,
+  .speech-home:not(.review-home) .speech-record-card,
+  .speech-home:not(.review-home) .speech-record-controls {
+    padding: 10px !important;
+    border-radius: 13px !important;
+  }
+}
+
+/* ===== SPEECH PREP PORTRAIT FINAL PROPORTIONS ===== */
+@media (orientation: portrait) {
+  .speech-home:not(.review-home) .speech-work-panel {
+    grid-template-columns: minmax(0, 1fr) !important;
+    grid-template-rows: auto minmax(108px, 1.32fr) minmax(44px, .42fr) auto !important;
+    gap: 7px !important;
+  }
+
+  .speech-home:not(.review-home) .speech-phrase-card {
+    min-height: 108px !important;
+    height: auto !important;
+    align-content: center !important;
+  }
+
+  .speech-home:not(.review-home) .speech-record-card {
+    min-height: 44px !important;
+    height: auto !important;
+    grid-template-columns: 30px minmax(0, 1fr) !important;
+    gap: 7px !important;
+    padding: 7px 9px !important;
+    align-items: center !important;
+  }
+
+  .speech-home:not(.review-home) .speech-record-icon {
+    width: 30px !important;
+    height: 30px !important;
+    border-radius: 8px !important;
+  }
+
+  .speech-home:not(.review-home) .speech-record-copy {
+    gap: 2px !important;
+  }
+
+  .speech-home:not(.review-home) .status-pill {
+    min-height: 24px !important;
+    padding: 3px 8px !important;
+    font-size: .68rem !important;
+    line-height: 1.05 !important;
+  }
+}
+
+@media (orientation: portrait) and (max-height: 700px) {
+  .speech-home:not(.review-home) .speech-work-panel {
+    grid-template-rows: auto minmax(92px, 1.18fr) minmax(40px, .38fr) auto !important;
+    gap: 5px !important;
+  }
+
+  .speech-home:not(.review-home) .speech-phrase-card {
+    min-height: 92px !important;
+  }
+
+  .speech-home:not(.review-home) .speech-record-card {
+    min-height: 40px !important;
+    grid-template-columns: 28px minmax(0, 1fr) !important;
+    padding: 6px 8px !important;
+  }
+
+  .speech-home:not(.review-home) .speech-record-icon {
+    width: 28px !important;
+    height: 28px !important;
+  }
+}
+
+/* ===== SPEECH PREP HEADER MATCH REVIEW LANDSCAPE ===== */
+@media (orientation: landscape) and (min-width: 520px) {
+  .speech-home:not(.review-home) {
+    position: relative !important;
+  }
+
+  .speech-home:not(.review-home) .google-home-header {
+    min-height: 70px !important;
+  }
+
+  .speech-home:not(.review-home) .speech-intro-panel {
+    position: absolute !important;
+    top: max(18px, env(safe-area-inset-top)) !important;
+    left: clamp(360px, 34vw, 500px) !important;
+    right: clamp(70px, 6vw, 108px) !important;
+    z-index: 4 !important;
+    display: grid !important;
+    grid-template-columns: minmax(0, 1fr) !important;
+    row-gap: 3px !important;
+    align-items: start !important;
+    width: auto !important;
+    max-width: none !important;
+    min-height: 0 !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    transform: none !important;
+    pointer-events: none !important;
+  }
+
+  .speech-home:not(.review-home) .speech-intro-panel h1 {
+    grid-column: 1 !important;
+    max-width: none !important;
+    font-size: clamp(1rem, 1.45vw, 1.24rem) !important;
+    line-height: 1.08 !important;
+    white-space: nowrap !important;
+    margin: 0 !important;
+    font-weight: 760 !important;
+  }
+
+  .speech-home:not(.review-home) .speech-intro-panel p {
+    grid-column: 1 !important;
+    max-width: 38ch !important;
+    font-size: clamp(.68rem, .9vw, .82rem) !important;
+    line-height: 1.15 !important;
+    white-space: normal !important;
+    margin: 0 !important;
+    overflow: visible !important;
+    text-overflow: clip !important;
+  }
+
+  .speech-home:not(.review-home) .google-home-main {
+    grid-template-rows: minmax(0, 1fr) !important;
+    padding-top: 16px !important;
+  }
+
+  .speech-home:not(.review-home) .speech-work-panel {
+    grid-row: 1 !important;
+    transform: translateY(34px) !important;
+  }
+}
+
+/* ===== SPEECH PREP LANDSCAPE ROW LAYOUT ===== */
+@media (orientation: landscape) and (min-width: 520px) {
+  .speech-home:not(.review-home) .speech-work-panel {
+    width: 100% !important;
+    max-width: none !important;
+    height: calc(100% - 34px) !important;
+    justify-self: center !important;
+    align-self: start !important;
+    display: grid !important;
+    grid-template-columns: minmax(0, 1fr) !important;
+    grid-template-rows: minmax(92px, 1fr) auto auto auto !important;
+    gap: 8px !important;
+    transform: translateY(34px) !important;
+    overflow: hidden !important;
+  }
+
+  .speech-home:not(.review-home) .speech-phrase-card,
+  .speech-home:not(.review-home) .speech-config-card,
+  .speech-home:not(.review-home) .speech-record-card,
+  .speech-home:not(.review-home) .speech-record-controls {
+    grid-column: 1 !important;
+    width: 100% !important;
+    min-height: 0 !important;
+    height: auto !important;
+    align-self: stretch !important;
+    padding: 8px 10px !important;
+    border-radius: 13px !important;
+  }
+
+  .speech-home:not(.review-home) .speech-phrase-card {
+    grid-row: 1 !important;
+    min-height: 92px !important;
+    align-content: center !important;
+  }
+
+  .speech-home:not(.review-home) .speech-config-card {
+    grid-row: 2 !important;
+    display: grid !important;
+    grid-template-columns: minmax(0, 1fr) minmax(180px, auto) !important;
+    align-items: end !important;
+    gap: 8px !important;
+  }
+
+  .speech-home:not(.review-home) .speech-config-grid {
+    display: grid !important;
+    grid-template-columns: repeat(3, minmax(0, 1fr)) !important;
+    gap: 8px !important;
+  }
+
+  .speech-home:not(.review-home) .speech-config-grid label:last-child {
+    grid-column: auto !important;
+  }
+
+  .speech-home:not(.review-home) .speech-config-grid label {
+    gap: 3px !important;
+    font-size: .7rem !important;
+  }
+
+  .speech-home:not(.review-home) .speech-config-grid select {
+    min-height: 30px !important;
+    padding: 4px 8px !important;
+    font-size: .78rem !important;
+  }
+
+  .speech-home:not(.review-home) .speech-button-row {
+    margin: 0 !important;
+    display: flex !important;
+    flex-wrap: nowrap !important;
+    gap: 6px !important;
+    align-items: end !important;
+  }
+
+  .speech-home:not(.review-home) .speech-button-row .soft-action {
+    min-width: 112px !important;
+    min-height: 32px !important;
+    padding: 6px 10px !important;
+    font-size: .78rem !important;
+    white-space: nowrap !important;
+  }
+
+  .speech-home:not(.review-home) .speech-record-card {
+    grid-row: 3 !important;
+    grid-template-columns: 34px minmax(0, 1fr) !important;
+    gap: 8px !important;
+    align-items: center !important;
+    min-height: 44px !important;
+  }
+
+  .speech-home:not(.review-home) .speech-record-icon {
+    width: 34px !important;
+    height: 34px !important;
+  }
+
+  .speech-home:not(.review-home) .speech-record-controls {
+    grid-row: 4 !important;
+    display: grid !important;
+    grid-template-columns: repeat(4, minmax(0, 1fr)) !important;
+    gap: 8px !important;
+  }
+
+  .speech-home:not(.review-home) .speech-record-controls button {
+    min-height: 34px !important;
+    padding: 6px 10px !important;
+    font-size: .78rem !important;
+  }
+}
+
+/* ===== SPEECH PREP LANDSCAPE WIDTH MATCH ===== */
+@media (orientation: landscape) and (min-width: 520px) {
+  .speech-home:not(.review-home) .google-home-main {
+    padding: 8px clamp(18px, 3vw, 30px) 10px !important;
+  }
+
+  .speech-home:not(.review-home) .speech-work-panel {
+    width: 100% !important;
+    max-width: none !important;
+    justify-self: stretch !important;
+  }
+}
+
+/* ===== REVIEW IMAGE LANDSCAPE FILL BOTTOM ===== */
+@media (orientation: landscape) and (min-width: 520px) {
+  .review-home .google-home-main {
+    grid-template-columns: minmax(0, 1fr) !important;
+    grid-template-rows: minmax(0, 1fr) !important;
+    padding: 8px clamp(18px, 3vw, 30px) 10px !important;
+    overflow: hidden !important;
+  }
+
+  .review-home .review-panel {
+    width: 100% !important;
+    max-width: none !important;
+    height: 100% !important;
+    max-height: none !important;
+    justify-self: stretch !important;
+    align-self: stretch !important;
+    transform: none !important;
+    display: grid !important;
+    grid-template-columns: minmax(0, 1fr) !important;
+    grid-template-rows: minmax(0, 1fr) auto !important;
+    gap: 8px !important;
+  }
+
+  .review-home .review-preview-card {
+    grid-column: 1 !important;
+    grid-row: 1 !important;
+    width: 100% !important;
+    height: 100% !important;
+    min-height: 0 !important;
+    max-height: none !important;
+  }
+
+  .review-home .preview-image {
+    width: 100% !important;
+    height: 100% !important;
+    min-height: 0 !important;
+    object-fit: contain !important;
+  }
+
+  .review-home .review-action-card.speech-record-controls,
+  .review-home .review-action-card {
+    grid-column: 1 !important;
+    grid-row: 2 !important;
+    width: 100% !important;
+    min-height: 64px !important;
+    height: 64px !important;
+    align-self: end !important;
+    display: grid !important;
+    grid-template-columns: minmax(0, 1fr) !important;
+    padding: 8px 10px !important;
+    overflow: hidden !important;
+  }
+
+  .review-home .review-action-row {
+    width: 100% !important;
+    display: grid !important;
+    grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+    gap: 8px !important;
+    align-items: center !important;
+  }
+
+  .review-home .review-action-row button {
+    min-height: 44px !important;
+    height: 44px !important;
+    padding: 7px 10px !important;
+    font-size: .78rem !important;
+  }
+}
+
+/* ===== REVIEW IMAGE PORTRAIT BUTTON BOX FIT ===== */
+@media (orientation: portrait) {
+  .review-home .google-home-main {
+    grid-template-rows: auto minmax(0, 1fr) !important;
+    gap: 8px !important;
+    padding: 4px clamp(12px, 3.5vw, 18px) 8px !important;
+    overflow: hidden !important;
+  }
+
+  .review-home .review-panel {
+    width: 100% !important;
+    height: 100% !important;
+    min-height: 0 !important;
+    display: grid !important;
+    grid-template-columns: minmax(0, 1fr) !important;
+    grid-template-rows: minmax(0, 1fr) 78px !important;
+    gap: 8px !important;
+    overflow: hidden !important;
+  }
+
+  .review-home .review-preview-card {
+    min-height: 0 !important;
+    height: 100% !important;
+    padding: 8px !important;
+    overflow: hidden !important;
+  }
+
+  .review-home .preview-image {
+    width: 100% !important;
+    height: 100% !important;
+    min-height: 0 !important;
+    object-fit: contain !important;
+  }
+
+  .review-home .review-action-card.speech-record-controls,
+  .review-home .review-action-card {
+    min-height: 78px !important;
+    height: 78px !important;
+    padding: 9px 10px !important;
+    display: grid !important;
+    align-items: center !important;
+    overflow: hidden !important;
+  }
+
+  .review-home .review-action-row {
+    width: 100% !important;
+    display: grid !important;
+    grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+    gap: 8px !important;
+    align-items: center !important;
+  }
+
+  .review-home .review-action-row button {
+    min-height: 58px !important;
+    height: 58px !important;
+    padding: 8px 10px !important;
+    font-size: .82rem !important;
+    line-height: 1.12 !important;
+  }
+}
+
+@media (orientation: portrait) and (max-height: 700px) {
+  .review-home .review-panel {
+    grid-template-rows: minmax(0, 1fr) 70px !important;
+    gap: 6px !important;
+  }
+
+  .review-home .review-action-card.speech-record-controls,
+  .review-home .review-action-card {
+    min-height: 70px !important;
+    height: 70px !important;
+    padding: 8px 9px !important;
+  }
+
+  .review-home .review-action-row button {
+    min-height: 52px !important;
+    height: 52px !important;
+    font-size: .78rem !important;
+  }
+}
+
+/* ===== SHARED RECORD CONTROLS FINAL — voz e confirma imagem iguais ===== */
+.speech-home:not(.review-home) .speech-record-controls,
+.review-home .image-confirm-controls {
+  width: 100% !important;
+  min-width: 0 !important;
+  min-height: 0 !important;
+  height: auto !important;
+  display: grid !important;
+  gap: 8px !important;
+  align-items: center !important;
+  padding: 8px 10px !important;
+  border: 1px solid #e8edf5 !important;
+  border-radius: 13px !important;
+  background: #fff !important;
+  box-shadow: 0 5px 16px rgba(15, 23, 42, .09) !important;
+  box-sizing: border-box !important;
+  overflow: hidden !important;
+}
+
+.speech-home:not(.review-home) .speech-record-controls button,
+.review-home .image-confirm-controls button {
+  width: 100% !important;
+  min-width: 0 !important;
+  min-height: 34px !important;
+  height: auto !important;
+  padding: 6px 10px !important;
+  font-size: .78rem !important;
+  line-height: 1.08 !important;
+  box-sizing: border-box !important;
+}
+
+.speech-home:not(.review-home) .speech-record-controls {
+  grid-template-columns: repeat(4, minmax(0, 1fr)) !important;
+}
+
+.review-home .image-confirm-controls {
+  grid-column: 1 !important;
+  grid-row: 2 !important;
+  grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+  justify-self: stretch !important;
+  align-self: stretch !important;
+}
+
+@media (orientation: landscape), (max-height: 620px) and (min-width: 520px) {
+  .review-home .google-home-main {
+    grid-template-columns: minmax(0, 1fr) !important;
+    grid-template-rows: minmax(0, 1fr) !important;
+    padding: 8px clamp(18px, 3vw, 30px) 8px !important;
+    overflow: hidden !important;
+  }
+
+  .review-home .review-panel {
+    width: 100% !important;
+    max-width: none !important;
+    height: 100% !important;
+    max-height: none !important;
+    min-height: 0 !important;
+    justify-self: stretch !important;
+    align-self: stretch !important;
+    transform: none !important;
+    display: grid !important;
+    grid-template-columns: minmax(0, 1fr) !important;
+    grid-template-rows: minmax(0, 1fr) auto !important;
+    gap: 8px !important;
+    overflow: hidden !important;
+  }
+
+  .review-home .review-preview-card {
+    grid-column: 1 !important;
+    grid-row: 1 !important;
+    width: 100% !important;
+    height: 100% !important;
+    min-height: 0 !important;
+    padding: 6px !important;
+    overflow: hidden !important;
+  }
+
+  .review-home .preview-image {
+    width: 100% !important;
+    height: 100% !important;
+    min-height: 0 !important;
+    object-fit: contain !important;
+  }
+
+  .review-home .image-confirm-controls {
+    min-height: 0 !important;
+    height: auto !important;
+  }
+}
+
+@media (orientation: portrait) {
+  .review-home .review-panel {
+    grid-template-rows: minmax(0, 1fr) auto !important;
+  }
+
+  .review-home .image-confirm-controls {
+    min-height: 0 !important;
+    height: auto !important;
+  }
+}
+
+/* ===== HOME / IMAGE SOURCE FINAL CENTERING ===== */
+@media (orientation: portrait) {
+  .home-screen .home-actions-panel,
+  .assisted-home .assisted-actions-panel {
+    height: calc(100% - clamp(10px, 2vh, 16px)) !important;
+    transform: translateY(clamp(10px, 2vh, 16px)) !important;
+  }
+}
+
+@media (orientation: landscape) and (min-width: 700px) {
+  .home-screen .home-actions-panel,
+  .assisted-home .assisted-actions-panel {
+    transform: translateY(66px) !important;
+  }
+}
+
+/* ===== READER TRANSPORT FINAL — sem bolas, cores Google ===== */
+.reader-home .transport-row .round-btn,
+.reader-home .transport-row .play-btn,
+.reader-home.settings-open:not(.speech-result-home) .transport-row .round-btn,
+.reader-home.settings-open:not(.speech-result-home) .transport-row .play-btn {
+  width: 34px !important;
+  height: 34px !important;
+  min-width: 34px !important;
+  min-height: 34px !important;
+  padding: 0 !important;
+  border: 0 !important;
+  border-radius: 0 !important;
+  background: transparent !important;
+  box-shadow: none !important;
+  display: grid !important;
+  place-items: center !important;
+  font-size: 1.18rem !important;
+  line-height: 1 !important;
+}
+
+.reader-home .transport-row .prev-btn {
+  color: #fbbc04 !important;
+}
+
+.reader-home .transport-row .play-btn {
+  color: #1a73e8 !important;
+}
+
+.reader-home .transport-row .play-btn.active {
+  color: #ea4335 !important;
+}
+
+.reader-home .transport-row .next-btn {
+  color: #34a853 !important;
+}
+
+.reader-home .transport-row .round-btn:disabled,
+.reader-home .transport-row .play-btn:disabled {
+  color: #dadce0 !important;
+  opacity: 1 !important;
+}
+
+/* ===== HEADER ICONS FINAL — sem circulos ===== */
+.google-home .home-help-btn,
+.google-home .reader-header-btn {
+  width: 38px !important;
+  height: 38px !important;
+  min-width: 38px !important;
+  min-height: 38px !important;
+  padding: 0 !important;
+  border: 0 !important;
+  border-radius: 0 !important;
+  background: transparent !important;
+  box-shadow: none !important;
+  color: #172033 !important;
+  display: grid !important;
+  place-items: center !important;
+}
+
+.google-home .home-help-btn svg,
+.google-home .reader-header-btn svg {
+  width: 23px !important;
+  height: 23px !important;
+}
+
+.google-home .reader-text-btn {
+  font-size: 1.38rem !important;
+  line-height: 1 !important;
+  font-weight: 760 !important;
 }
 </style>

@@ -151,6 +151,100 @@ Then the app is run on a real Android device.
 
 ---
 
+## Frontend environment and mock mode
+
+The Vue frontend uses **Vite** environment variables. Only variables whose name starts with `VITE_` are exposed to the app.
+
+Important: these variables are read by Vite at **development/build time**. In the Android app they are bundled into the generated web assets. That means the Android app does **not** read `.env` dynamically at runtime after it has already been compiled.
+
+Create a frontend environment file from the example:
+
+```bash
+cd frontend
+cp .env.example .env
+```
+
+Available variables:
+
+```env
+VITE_DYSLEXAI_MOCK=false
+VITE_IMAGE_INFERENCE_TIMEOUT_MS=900000
+```
+
+### Real inference mode
+
+Use real web/native inference by keeping mock mode disabled:
+
+```env
+VITE_DYSLEXAI_MOCK=false
+```
+
+Then rebuild and sync Android:
+
+```bash
+cd frontend
+npm run build
+npx cap sync android
+```
+
+### Mock inference mode
+
+Use mock mode to develop and test the interface without waiting for the local model:
+
+```env
+VITE_DYSLEXAI_MOCK=true
+```
+
+Then rebuild and sync Android:
+
+```bash
+cd frontend
+npm run build
+npx cap sync android
+```
+
+For a one-off web build without editing `.env`:
+
+```bash
+cd frontend
+VITE_DYSLEXAI_MOCK=true npm run build
+```
+
+For local browser development:
+
+```bash
+cd frontend
+VITE_DYSLEXAI_MOCK=true npm run dev
+```
+
+The mock provider simulates:
+
+- image processing
+- phrase generation
+- audio transcription
+- text-to-speech calls
+- native WAV recording calls
+
+This is intended only for interface development and fast testing.
+
+### Timeout configuration
+
+Image inference timeout is configured with:
+
+```env
+VITE_IMAGE_INFERENCE_TIMEOUT_MS=900000
+```
+
+`900000` milliseconds is 15 minutes. Because this is also a Vite variable, changing it for Android requires:
+
+```bash
+cd frontend
+npm run build
+npx cap sync android
+```
+
+---
+
 ## Current status
 
 ### Working now

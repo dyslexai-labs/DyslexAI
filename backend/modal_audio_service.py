@@ -58,7 +58,7 @@ def extract_json_block(text: str):
 @app.function(
     image=image,
     gpu="T4",
-    timeout=900,
+    timeout=9000,
     scaledown_window=300,
     volumes={"/cache": model_volume},
 )
@@ -135,7 +135,7 @@ def process_audio():
             inputs = {k: v.to(model.device) for k, v in inputs.items()}
 
             with torch.no_grad():
-                output = model.generate(**inputs, max_new_tokens=256)
+                output = model.generate(**inputs, max_new_tokens=512)
 
             raw = processor.batch_decode(
                 output,

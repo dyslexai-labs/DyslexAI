@@ -1,0 +1,10 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024" role="img" aria-label="DyslexAI">
+  <rect width="1024" height="1024" rx="224" fill="#ffffff"/>
+  <g transform="translate(170 154)">
+    <path d="M74 42h270c198 0 360 150 360 337S542 716 344 716H74z" fill="#1a73e8"/>
+    <path d="M74 42h176v182H74z" fill="#ea4335"/>
+    <path d="M74 267h176v182H74z" fill="#fbbc04"/>
+    <path d="M74 492h176v224H74z" fill="#34a853"/>
+    <path d="M320 224h18c90 0 163 70 163 156s-73 156-163 156h-18z" fill="#ffffff"/>
+  </g>
+</svg>

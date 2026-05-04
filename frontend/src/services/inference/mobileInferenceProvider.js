@@ -1,4 +1,15 @@
 import { DyslexAIPlugin } from './capacitorDyslexAI'
+import { IMAGE_INFERENCE_TIMEOUT_MS } from '../../config'
+
+function withTimeout(promise, timeoutMs, message) {
+  let timeoutId
+  const timeout = new Promise((_, reject) => {
+    timeoutId = window.setTimeout(() => reject(new Error(message)), timeoutMs)
+  })
+
+  return Promise.race([promise, timeout])
+    .finally(() => window.clearTimeout(timeoutId))
+}
 
 export function createMobileInferenceProvider() {
   return {
@@ -19,10 +30,14 @@ export function createMobileInferenceProvider() {
         throw new Error('Imagem vazia ou não preparada.')
       }
 
-      return DyslexAIPlugin.processImage({
-        imageBase64: payload.imageBase64,
-        mimeType: payload.mimeType || 'image/jpeg',
-      })
+      return withTimeout(
+        DyslexAIPlugin.processImage({
+          imageBase64: payload.imageBase64,
+          mimeType: payload.mimeType || 'image/jpeg',
+        }),
+        IMAGE_INFERENCE_TIMEOUT_MS,
+        `A inferência da imagem excedeu o tempo limite de ${Math.round(IMAGE_INFERENCE_TIMEOUT_MS / 1000)} segundos.`
+      )
     },
 
     async generateReadingPhrase(options = {}) {
