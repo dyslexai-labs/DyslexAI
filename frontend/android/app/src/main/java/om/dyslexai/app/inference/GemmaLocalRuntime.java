@@ -1,6 +1,8 @@
 package om.dyslexai.app.inference;
 
 import android.content.Context;
+import android.content.SharedPreferences;
+import android.os.Build;
 import android.util.Log;
 
 import java.io.File;
@@ -13,6 +15,11 @@ public class GemmaLocalRuntime implements LocalModelRuntime {
 
     private static final String TAG = "GemmaLocalRuntime";
     private static final String MODEL_PATH = "/data/local/tmp/llm/gemma/model.litertlm";
+    private static final String GPU_PREFS = "dyslexai_gpu_policy";
+    private static final String KEY_MAIN_GPU_SUPPORTED = "main_gpu_supported";
+    private static final String KEY_MAIN_GPU_CRASHED = "main_gpu_crashed";
+    private static final String KEY_MAIN_GPU_PROBE_PENDING = "main_gpu_probe_pending";
+    private static final String KEY_DEVICE_FINGERPRINT = "device_fingerprint";
 
     private boolean initialized = false;
     private String cacheDirPath;
@@ -22,6 +29,7 @@ public class GemmaLocalRuntime implements LocalModelRuntime {
     @Override
     public synchronized void initialize(Context context) throws Exception {
         if (initialized) return;
+        long start = System.nanoTime();
 
         File modelFile = new File(MODEL_PATH);
         if (!modelFile.exists()) {
@@ -29,14 +37,32 @@ public class GemmaLocalRuntime implements LocalModelRuntime {
         }
 
         cacheDirPath = context.getCacheDir().getAbsolutePath();
+        SharedPreferences gpuPrefs = context.getSharedPreferences(GPU_PREFS, Context.MODE_PRIVATE);
+        reconcilePendingGpuProbe(gpuPrefs);
+        boolean useMainGpu = shouldUseMainGpu(gpuPrefs);
 
         Log.i(TAG, "Modelo encontrado: " + MODEL_PATH);
         Log.i(TAG, "A inicializar engine LiteRT-LM com suporte de visão e áudio...");
+        Log.i(TAG, "Política GPU -> useMainGpu=" + useMainGpu
+                + ", manufacturer=" + Build.MANUFACTURER
+                + ", brand=" + Build.BRAND
+                + ", model=" + Build.MODEL);
 
-        engine = LiteRtBridge.createEngine(MODEL_PATH, cacheDirPath, true);
+        markGpuProbeStartedIfNeeded(gpuPrefs, useMainGpu);
+
+        try {
+            engine = LiteRtBridge.createEngine(MODEL_PATH, cacheDirPath, true, useMainGpu);
+            markGpuProbeSucceededIfNeeded(gpuPrefs, useMainGpu);
+        } catch (Exception e) {
+            markGpuProbeFailedIfNeeded(gpuPrefs, useMainGpu);
+            throw e;
+        } catch (Error e) {
+            markGpuProbeFailedIfNeeded(gpuPrefs, useMainGpu);
+            throw e;
+        }
 
         initialized = true;
-        Log.i(TAG, "Engine inicializada com sucesso.");
+        Log.i(TAG, "Engine inicializada com sucesso. initMs=" + elapsedMs(start));
     }
 
     @Override
@@ -53,9 +79,10 @@ public class GemmaLocalRuntime implements LocalModelRuntime {
         Log.i(TAG, "A inferir texto localmente...");
         Log.i(TAG, "Prompt de texto enviada:\n" + prompt);
 
+        long start = System.nanoTime();
         String response = LiteRtBridge.runText(engine, prompt);
 
-        Log.i(TAG, "Resposta de texto recebida:\n" + response);
+        Log.i(TAG, "Resposta de texto recebida. totalMs=" + elapsedMs(start) + "\n" + response);
         return response;
     }
 
@@ -65,15 +92,18 @@ public class GemmaLocalRuntime implements LocalModelRuntime {
             throw new IllegalStateException("Runtime ainda não inicializado.");
         }
 
+        long persistStart = System.nanoTime();
         File imageFile = persistTempImage(imageBytes, mimeType);
+        Log.i(TAG, "Imagem persistida em cache. persistMs=" + elapsedMs(persistStart));
         Log.i(TAG, "A inferir imagem localmente: " + imageFile.getAbsolutePath());
         Log.i(TAG, "MimeType da imagem: " + mimeType);
         Log.i(TAG, "Tamanho da imagem em bytes: " + imageBytes.length);
         Log.i(TAG, "Prompt de imagem enviada:\n" + prompt);
 
+        long inferStart = System.nanoTime();
         String response = LiteRtBridge.runImage(engine, imageFile.getAbsolutePath(), prompt);
 
-        Log.i(TAG, "Resposta da imagem recebida:\n" + response);
+        Log.i(TAG, "Resposta da imagem recebida. totalInferMs=" + elapsedMs(inferStart) + "\n" + response);
         return response;
     }
 
@@ -88,18 +118,105 @@ public class GemmaLocalRuntime implements LocalModelRuntime {
         Log.i(TAG, "Tamanho do áudio em bytes: " + (audioBytes == null ? 0 : audioBytes.length));
         Log.i(TAG, "Prompt de áudio enviada:\n" + prompt);
 
+        long persistStart = System.nanoTime();
         File audioFile = persistTempAudio(audioBytes, mimeType);
+        Log.i(TAG, "Áudio persistido em cache. persistMs=" + elapsedMs(persistStart));
         Log.i(TAG, "A inferir áudio localmente: " + audioFile.getAbsolutePath());
 
+        long inferStart = System.nanoTime();
         String response = LiteRtBridge.runAudioFile(engine, audioFile.getAbsolutePath(), prompt);
 
-        Log.i(TAG, "Resposta de áudio recebida:\n" + response);
+        Log.i(TAG, "Resposta de áudio recebida. totalInferMs=" + elapsedMs(inferStart) + "\n" + response);
         return response;
     }
 
     @Override
     public String getName() {
         return "gemma-3n-e2b-local";
+    }
+
+    private void reconcilePendingGpuProbe(SharedPreferences prefs) {
+        String currentFingerprint = deviceFingerprint();
+        String savedFingerprint = prefs.getString(KEY_DEVICE_FINGERPRINT, "");
+
+        if (!currentFingerprint.equals(savedFingerprint)) {
+            Log.i(TAG, "GPU policy -> dispositivo/modelo mudou. A reiniciar política GPU.");
+            prefs.edit()
+                    .clear()
+                    .putString(KEY_DEVICE_FINGERPRINT, currentFingerprint)
+                    .apply();
+            return;
+        }
+
+        if (prefs.getBoolean(KEY_MAIN_GPU_PROBE_PENDING, false)) {
+            Log.w(TAG, "GPU policy -> a tentativa anterior de GPU ficou pendente. Assumir crash nativo e desativar GPU principal neste dispositivo.");
+            prefs.edit()
+                    .putBoolean(KEY_MAIN_GPU_CRASHED, true)
+                    .putBoolean(KEY_MAIN_GPU_SUPPORTED, false)
+                    .putBoolean(KEY_MAIN_GPU_PROBE_PENDING, false)
+                    .apply();
+        }
+    }
+
+    private boolean shouldUseMainGpu(SharedPreferences prefs) {
+        if (prefs.getBoolean(KEY_MAIN_GPU_CRASHED, false)) {
+            return false;
+        }
+
+        if (prefs.contains(KEY_MAIN_GPU_SUPPORTED)) {
+            return prefs.getBoolean(KEY_MAIN_GPU_SUPPORTED, true);
+        }
+
+        return true;
+    }
+
+    private void markGpuProbeStartedIfNeeded(SharedPreferences prefs, boolean useMainGpu) {
+        if (!useMainGpu) return;
+
+        prefs.edit()
+                .putString(KEY_DEVICE_FINGERPRINT, deviceFingerprint())
+                .putBoolean(KEY_MAIN_GPU_PROBE_PENDING, true)
+                .apply();
+
+        Log.i(TAG, "GPU policy -> probe GPU iniciado. Se a app morrer agora, o próximo arranque usará CPU principal.");
+    }
+
+    private void markGpuProbeSucceededIfNeeded(SharedPreferences prefs, boolean useMainGpu) {
+        if (!useMainGpu) return;
+
+        prefs.edit()
+                .putString(KEY_DEVICE_FINGERPRINT, deviceFingerprint())
+                .putBoolean(KEY_MAIN_GPU_SUPPORTED, true)
+                .putBoolean(KEY_MAIN_GPU_CRASHED, false)
+                .putBoolean(KEY_MAIN_GPU_PROBE_PENDING, false)
+                .apply();
+
+        Log.i(TAG, "GPU policy -> GPU principal validado para este dispositivo.");
+    }
+
+    private void markGpuProbeFailedIfNeeded(SharedPreferences prefs, boolean useMainGpu) {
+        if (!useMainGpu) return;
+
+        prefs.edit()
+                .putString(KEY_DEVICE_FINGERPRINT, deviceFingerprint())
+                .putBoolean(KEY_MAIN_GPU_SUPPORTED, false)
+                .putBoolean(KEY_MAIN_GPU_CRASHED, true)
+                .putBoolean(KEY_MAIN_GPU_PROBE_PENDING, false)
+                .apply();
+
+        Log.w(TAG, "GPU policy -> GPU principal falhou com exceção recuperável. Futuramente será usado CPU principal.");
+    }
+
+    private String deviceFingerprint() {
+        return safeBuildValue(Build.MANUFACTURER) + "|"
+                + safeBuildValue(Build.BRAND) + "|"
+                + safeBuildValue(Build.MODEL) + "|"
+                + safeBuildValue(Build.HARDWARE) + "|"
+                + safeBuildValue(Build.VERSION.RELEASE);
+    }
+
+    private String safeBuildValue(String value) {
+        return value == null ? "" : value.trim().toLowerCase(Locale.ROOT);
     }
 
     private File persistTempImage(byte[] imageBytes, String mimeType) throws IOException {
@@ -158,5 +275,9 @@ public class GemmaLocalRuntime implements LocalModelRuntime {
         if (normalized.contains("webm")) return ".webm";
         if (normalized.contains("ogg")) return ".ogg";
         return ".wav";
+    }
+
+    private long elapsedMs(long startNanos) {
+        return (System.nanoTime() - startNanos) / 1_000_000L;
     }
 }

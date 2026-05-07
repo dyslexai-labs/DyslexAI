@@ -29,7 +29,7 @@
               class="word-chip" :class="{ active: index === currentWordIndex }" :style="index === currentWordIndex
                 ? { ...activeWordStyle, '--active-word-bg': paletteStyles.activeBg, '--active-word-text': paletteStyles.activeText }
                 : { color: paletteStyles.inactiveWord }">
-              {{ word }}
+              {{ word }}<template v-if="index < currentWords.length - 1"> </template>
             </span>
           </div>
         </div>
@@ -51,6 +51,14 @@
             </div>
             <button class="soft-action result-listen-btn" @click="$emit('speak-text', spokenText)">Ouvir</button>
           </article>
+
+          <button
+            v-if="audioFeedbackText"
+            class="soft-action result-feedback-listen-btn"
+            @click="$emit('speak-text', audioFeedbackText)"
+          >
+            Ouvir comentário
+          </button>
         </section>
 
         <div v-else class="player-bottom reader-bottom">
@@ -129,7 +137,7 @@
             <div class="settings-panel">
               <div class="setting-block">
                 <label>Fonte {{ fontSize }}</label>
-                <input :value="fontSize" type="range" min="18" max="34"
+                <input :value="fontSize" type="range" min="14" max="24"
                   @input="$emit('update:fontSize', Number($event.target.value))" />
               </div>
 
@@ -181,6 +189,10 @@ const props = defineProps({
   audioIssues: {
     type: Array,
     default: () => [],
+  },
+  audioFeedbackText: {
+    type: String,
+    default: '',
   },
   autoAdvanceLine: {
     type: Boolean,
@@ -314,6 +326,7 @@ defineEmits([
 
 .reader-main {
   grid-template-rows: minmax(0, 1fr) auto !important;
+  align-content: stretch !important;
   justify-items: stretch !important;
   gap: 10px !important;
   padding-top: 8px !important;
@@ -331,14 +344,32 @@ defineEmits([
 }
 
 .reader-top {
+  display: grid !important;
+  place-items: center !important;
   min-height: 0 !important;
+  height: 100% !important;
 }
 
 .reader-bottom {
   display: grid !important;
-  align-content: start !important;
+  align-self: end !important;
+  align-content: end !important;
   gap: 12px !important;
   min-height: 0 !important;
+  width: 100% !important;
+}
+
+.check-block {
+  grid-column: 1 / -1 !important;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  gap: 8px !important;
+  width: 100% !important;
+  min-width: 0 !important;
+  white-space: nowrap !important;
+  font-size: .78rem !important;
+  line-height: 1.1 !important;
 }
 
 .speech-result-home .reader-main {
@@ -396,6 +427,20 @@ defineEmits([
   color: #1a73e8 !important;
   font-weight: 760 !important;
   white-space: nowrap !important;
+}
+
+.result-feedback-listen-btn {
+  justify-self: center !important;
+  align-self: center !important;
+  min-height: 40px !important;
+  min-width: 150px !important;
+  padding: 8px 16px !important;
+  border-radius: 999px !important;
+  background: #e8f0fe !important;
+  color: #1a73e8 !important;
+  font-weight: 760 !important;
+  font-size: .9rem !important;
+  box-shadow: 0 4px 12px rgba(26, 115, 232, .14) !important;
 }
 
 .speech-result-home .reader-bottom {
@@ -472,6 +517,53 @@ defineEmits([
   color: #667085 !important;
 }
 
+.word-chip.active {
+  background: var(--active-word-bg) !important;
+  color: var(--active-word-text) !important;
+  border-color: transparent !important;
+}
+
+.line-focus,
+.word-focus,
+.word-context {
+  width: 100% !important;
+  max-width: none !important;
+  min-width: 0 !important;
+}
+
+.line-focus {
+  text-align: justify !important;
+  text-align-last: left !important;
+  overflow-wrap: anywhere !important;
+  word-break: normal !important;
+  hyphens: auto !important;
+}
+
+.word-context {
+  display: block !important;
+  text-align: justify !important;
+  text-align-last: left !important;
+  line-height: 1.45 !important;
+  white-space: normal !important;
+  overflow-wrap: anywhere !important;
+  word-break: normal !important;
+}
+
+.word-chip {
+  display: inline !important;
+  margin-right: 0 !important;
+  padding: 0 .08em !important;
+  border: 0 !important;
+  border-radius: 3px !important;
+  background: transparent !important;
+  box-shadow: none !important;
+  white-space: normal !important;
+}
+
+.reader-top {
+  overflow: hidden !important;
+}
+
 @media (orientation: landscape), (max-height: 620px) and (min-width: 520px) {
   .reader-home {
     height: 100dvh !important;
@@ -493,7 +585,7 @@ defineEmits([
     width: min(100%, 1080px) !important;
     height: 100% !important;
     align-self: stretch !important;
-    grid-template-rows: repeat(2, minmax(0, 1fr)) !important;
+    grid-template-rows: repeat(2, minmax(0, 1fr)) auto !important;
     gap: 10px !important;
   }
 
@@ -541,7 +633,8 @@ defineEmits([
   }
 
   .line-focus {
-    max-width: 720px !important;
+    width: 100% !important;
+    max-width: none !important;
     line-height: 1.2 !important;
   }
 
@@ -552,15 +645,15 @@ defineEmits([
 
   .word-context {
     width: 100% !important;
-    gap: 6px !important;
+    gap: 0 !important;
   }
 
   .word-chip {
-    background: #fff !important;
-    border: 1px solid #d8e2ef !important;
+    background: transparent !important;
+    border: 0 !important;
     color: #172033 !important;
-    padding: 8px 12px !important;
-    box-shadow: 0 3px 10px rgba(15, 23, 42, .05) !important;
+    padding: 0 .08em !important;
+    box-shadow: none !important;
   }
 
   .word-chip.active {
@@ -652,7 +745,7 @@ defineEmits([
     height: 100% !important;
     align-self: stretch !important;
     justify-self: stretch !important;
-    grid-template-rows: repeat(2, minmax(0, 1fr)) !important;
+    grid-template-rows: repeat(2, minmax(0, 1fr)) auto !important;
     gap: 10px !important;
   }
 
@@ -717,7 +810,7 @@ defineEmits([
 
   .speech-result-home .reader-summary-stack {
     grid-template-columns: 1fr !important;
-    grid-template-rows: repeat(2, minmax(0, 1fr)) !important;
+    grid-template-rows: repeat(2, minmax(0, 1fr)) auto !important;
     gap: 12px !important;
   }
 
@@ -815,7 +908,7 @@ defineEmits([
     grid-column: 1 / -1 !important;
     display: grid !important;
     grid-template-columns: minmax(0, 1fr) !important;
-    grid-template-rows: repeat(2, minmax(0, 1fr)) !important;
+    grid-template-rows: repeat(2, minmax(0, 1fr)) auto !important;
     gap: 12px !important;
   }
 
@@ -878,7 +971,7 @@ defineEmits([
 
 @media (orientation: portrait) and (max-width: 620px) {
   .reader-home.settings-open:not(.speech-result-home) .reader-main {
-    grid-template-rows: minmax(0, .72fr) auto !important;
+    grid-template-rows: minmax(0, 1fr) auto !important;
     gap: 6px !important;
     padding: 4px 12px 6px !important;
     overflow: hidden !important;
@@ -893,7 +986,9 @@ defineEmits([
   .reader-home.settings-open:not(.speech-result-home) .line-focus {
     max-width: 100% !important;
     width: 100% !important;
-    line-height: 1.2 !important;
+    line-height: 1.24 !important;
+    text-align: justify !important;
+    text-align-last: left !important;
   }
 
   .reader-home.settings-open:not(.speech-result-home) .word-focus {
@@ -902,6 +997,8 @@ defineEmits([
   }
 
   .reader-home.settings-open:not(.speech-result-home) .reader-bottom {
+    align-self: end !important;
+    align-content: end !important;
     max-height: none !important;
     min-height: 0 !important;
     overflow: hidden !important;
@@ -981,6 +1078,13 @@ defineEmits([
     border-radius: 12px !important;
   }
 
+  .reader-home.settings-open:not(.speech-result-home) .check-block {
+    grid-column: 1 / -1 !important;
+    min-height: 24px !important;
+    white-space: nowrap !important;
+    font-size: .72rem !important;
+  }
+
   .reader-home.settings-open:not(.speech-result-home) .setting-block {
     gap: 4px !important;
     font-size: .72rem !important;
@@ -999,7 +1103,7 @@ defineEmits([
 
 @media (orientation: portrait) and (max-width: 620px) and (max-height: 700px) {
   .reader-home.settings-open:not(.speech-result-home) .reader-main {
-    grid-template-rows: minmax(0, .58fr) auto !important;
+    grid-template-rows: minmax(0, 1fr) auto !important;
     gap: 4px !important;
   }
 
@@ -1025,6 +1129,11 @@ defineEmits([
   .reader-home.settings-open:not(.speech-result-home) .settings-panel {
     padding: 6px !important;
   }
+
+  .reader-home.settings-open:not(.speech-result-home) .check-block {
+    min-height: 20px !important;
+    font-size: .68rem !important;
+  }
 }
 
 @media (orientation: landscape) and (min-width: 520px) {
@@ -1047,7 +1156,9 @@ defineEmits([
   .reader-home.settings-open:not(.speech-result-home) .line-focus {
     width: 100% !important;
     max-width: 100% !important;
-    line-height: 1.2 !important;
+    line-height: 1.24 !important;
+    text-align: justify !important;
+    text-align-last: left !important;
   }
 
   .reader-home.settings-open:not(.speech-result-home) .word-focus,
@@ -1057,17 +1168,29 @@ defineEmits([
   }
 
   .reader-home.settings-open:not(.speech-result-home) .word-context {
-    gap: 6px !important;
+    gap: 0 !important;
+    text-align: justify !important;
+    text-align-last: left !important;
+    white-space: normal !important;
+    overflow-wrap: anywhere !important;
   }
 
   .reader-home.settings-open:not(.speech-result-home) .word-chip {
-    padding: 6px 9px !important;
+    padding: 0 .08em !important;
+    margin-right: 0 !important;
+    border: 0 !important;
+    border-radius: 3px !important;
+    background: transparent !important;
+    box-shadow: none !important;
+    white-space: normal !important;
     font-weight: 760 !important;
   }
 
   .reader-home.settings-open:not(.speech-result-home) .reader-bottom {
     grid-column: 1 !important;
     grid-row: 2 !important;
+    align-self: end !important;
+    align-content: end !important;
     max-height: none !important;
     min-height: 0 !important;
     overflow: hidden !important;
@@ -1121,6 +1244,14 @@ defineEmits([
   .reader-home.settings-open:not(.speech-result-home) .setting-block input {
     font-size: .72rem !important;
     line-height: 1.1 !important;
+  }
+
+  .reader-home.settings-open:not(.speech-result-home) .check-block {
+    grid-column: 1 / -1 !important;
+    justify-content: center !important;
+    min-height: 22px !important;
+    white-space: nowrap !important;
+    font-size: .72rem !important;
   }
 }
 </style>

@@ -1,26 +1,28 @@
 package om.dyslexai.app.inference;
 
 import android.content.Context;
+import android.graphics.Bitmap;
+import android.graphics.BitmapFactory;
 import android.util.Base64;
 import android.util.Log;
 
 import com.getcapacitor.JSArray;
 import com.getcapacitor.JSObject;
 
-
 import org.json.JSONArray;
 import org.json.JSONObject;
 
+import java.io.ByteArrayOutputStream;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.regex.Pattern;
-
-
 
 public class DyslexAIEngine {
 
     private static final String TAG = "DyslexAIEngine";
     private static final Pattern LINE_SPLIT_PATTERN = Pattern.compile("\\r?\\n+|(?<=[\\.!\\?])\\s+");
+    private static final int IMAGE_MAX_EDGE_PX = 640;
+    private static final int IMAGE_JPEG_QUALITY = 62;
 
     private final LocalModelRuntime runtime;
 
@@ -76,24 +78,41 @@ public class DyslexAIEngine {
     }
 
     public JSObject processImage(Context context, String imageBase64, String mimeType) throws Exception {
+        long totalStart = System.nanoTime();
         ensureRuntime(context);
 
         Log.i(TAG, "processImage() one-pass -> mimeType=" + mimeType +
                 ", base64 length=" + (imageBase64 == null ? 0 : imageBase64.length()));
 
+        long decodeStart = System.nanoTime();
         byte[] imageBytes = decodeBase64Payload(imageBase64);
-        Log.i(TAG, "processImage() one-pass -> bytes decodificados=" + imageBytes.length);
+        Log.i(TAG, "processImage() one-pass -> bytes decodificados=" + imageBytes.length +
+                ", decodeMs=" + elapsedMs(decodeStart));
 
         String prompt = buildImageFullPrompt();
-        Log.i(TAG, "Prompt única de imagem enviada ao runtime:\n" + prompt);
+        Log.i(TAG, "Prompt única de imagem enviada ao runtime (" + prompt.length() + " chars):\n" + prompt);
 
-        String raw = runtime.inferImage(imageBytes, mimeType, prompt);
-        Log.i(TAG, "Resposta bruta da imagem one-pass:\n" + raw);
+        long inferStart = System.nanoTime();
+        String raw = runtime.inferImage(imageBytes, safe(mimeType, "image/jpeg"), prompt);
+        Log.i(TAG, "Resposta bruta da imagem one-pass inferMs=" + elapsedMs(inferStart) + ":\n" + raw);
 
+        long parseStart = System.nanoTime();
         String cleaned = cleanModelText(raw);
         Log.i(TAG, "Resposta limpa da imagem one-pass:\n" + cleaned);
 
-        return parseImageFullResult(cleaned);
+        JSObject result = parseImageFullResult(cleaned);
+        JSONObject meta = result.optJSONObject("meta");
+        if (meta == null) {
+            meta = new JSObject();
+            result.put("meta", meta);
+        }
+        meta.put("image_original_bytes", imageBytes.length);
+        meta.put("image_mode", "frontend-image");
+        meta.put("parse_ms", elapsedMs(parseStart));
+        meta.put("total_ms", elapsedMs(totalStart));
+
+        Log.i(TAG, "processImage() one-pass -> totalMs=" + elapsedMs(totalStart));
+        return result;
     }
 
     public JSObject generateReadingPhrase(Context context, String ageGroup, String level, String type) throws Exception {
@@ -121,100 +140,279 @@ public class DyslexAIEngine {
         result.put("meta", meta);
         return result;
     }
-public JSObject processAudio(Context context, String audioBase64, String mimeType, String expectedText) throws Exception {
-    ensureRuntime(context);
 
-    Log.i(TAG, "processAudio() REAL chamado.");
-    Log.i(TAG, "processAudio() -> mimeType=" + mimeType +
-            ", base64 length=" + (audioBase64 == null ? 0 : audioBase64.length()));
+    public JSObject processAudio(Context context, String audioBase64, String mimeType, String expectedText) throws Exception {
+        ensureRuntime(context);
 
-    byte[] audioBytes = decodeBase64Payload(audioBase64);
-    Log.i(TAG, "processAudio() -> bytes decodificados=" + audioBytes.length);
+        Log.i(TAG, "processAudio() REAL chamado.");
+        Log.i(TAG, "processAudio() -> mimeType=" + mimeType +
+                ", base64 length=" + (audioBase64 == null ? 0 : audioBase64.length()));
 
-    String prompt =
-            "Transcreve este áudio em português europeu. " +
-            "Depois compara com a frase esperada e devolve APENAS JSON válido, sem Markdown, sem ```json e sem explicações.\n\n" +
-            "Frase esperada: " + safe(expectedText, "") + "\n\n" +
-            "Formato obrigatório:\n" +
-            "{ \"transcription\": \"...\", \"clean_text\": \"...\", \"issues\": [] }";
+        byte[] audioBytes = decodeBase64Payload(audioBase64);
+        Log.i(TAG, "processAudio() -> bytes decodificados=" + audioBytes.length);
 
-    Log.i(TAG, "A chamar runtime.inferAudio...");
+        String transcriptionPrompt = buildAudioTranscriptionOnlyPrompt();
+        Log.i(TAG, "Prompt de TRANSCRIÇÃO enviada ao runtime:\n" + transcriptionPrompt);
 
-    String raw;
+        String rawTranscription;
+        try {
+            rawTranscription = runtime.inferAudio(audioBytes, mimeType, transcriptionPrompt);
+        } catch (Exception e) {
+            Log.e(TAG, "inferAudio() falhou. Vou usar fallback controlado.", e);
+            return buildAudioDecodeFallbackResult(expectedText, mimeType, audioBytes.length, e);
+        }
 
-    try {
-        raw = runtime.inferAudio(audioBytes, mimeType, prompt);
-    } catch (Exception e) {
-        Log.e(TAG, "inferAudio() falhou. Vou usar fallback controlado para demo.", e);
-        return buildAudioDecodeFallbackResult(expectedText, mimeType, audioBytes.length, e);
+        Log.i(TAG, "Resposta bruta da TRANSCRIÇÃO:\n" + rawTranscription);
+
+        JSObject transcriptionParsed = parseModelJson(rawTranscription);
+        String transcription = safe(transcriptionParsed.optString("transcription", ""), "");
+
+        if (transcription.trim().isEmpty()) {
+            transcription = extractLikelyPlainTranscription(rawTranscription);
+        }
+
+        transcription = cleanModelText(transcription);
+
+        Log.i(TAG, "processAudio() -> transcrição isolada=" + transcription);
+
+        String rawFeedback = "";
+        JSObject feedbackParsed = new JSObject();
+
+        if (!transcription.trim().isEmpty()) {
+            String feedbackPrompt = buildAudioReadingFeedbackPrompt(expectedText, transcription);
+            Log.i(TAG, "Prompt de FEEDBACK enviada ao runtime:\n" + feedbackPrompt);
+
+            try {
+                rawFeedback = runtime.inferText(feedbackPrompt);
+                Log.i(TAG, "Resposta bruta do FEEDBACK:\n" + rawFeedback);
+                feedbackParsed = parseModelJson(rawFeedback);
+            } catch (Exception e) {
+                Log.e(TAG, "inferText() para feedback falhou. Vou devolver transcrição sem análise completa.", e);
+            }
+        }
+
+        String expectedTextFromFeedback = safe(feedbackParsed.optString("expected_text", ""), expectedText);
+        String spokenText = safe(feedbackParsed.optString("spoken_text", ""), transcription);
+
+        if (spokenText.trim().isEmpty()) {
+            spokenText = transcription;
+        }
+
+        String cleanText = spokenText;
+
+        String syllabifiedExpectedText = safe(feedbackParsed.optString("syllabified_expected_text", ""), "");
+        String syllabifiedSpokenText = safe(feedbackParsed.optString("syllabified_spoken_text", ""), "");
+        String feedbackComment = safe(feedbackParsed.optString("feedback_comment", ""), "");
+
+        if (feedbackComment.trim().isEmpty()) {
+            feedbackComment = "Tenta ler novamente com calma.";
+        }
+
+        JSArray issues = extractIssues(feedbackParsed);
+
+        // Compatibilidade com o frontend atual: o botão “Ouvir comentário” pode continuar a ler estes campos.
+        String comparisonSummary = feedbackComment;
+        String positiveFeedback = "";
+        String improvementTip = "";
+
+        Log.i(TAG, "processAudio() -> transcription=" + transcription);
+        Log.i(TAG, "processAudio() -> expected_text=" + expectedTextFromFeedback);
+        Log.i(TAG, "processAudio() -> spoken_text=" + spokenText);
+        Log.i(TAG, "processAudio() -> syllabified_expected_text=" + syllabifiedExpectedText);
+        Log.i(TAG, "processAudio() -> syllabified_spoken_text=" + syllabifiedSpokenText);
+        Log.i(TAG, "processAudio() -> feedback_comment=" + feedbackComment);
+        Log.i(TAG, "processAudio() -> issues count=" + issues.length());
+
+        JSObject result = new JSObject();
+        result.put("success", true);
+        result.put("transcription", transcription);
+        result.put("expected_text", expectedTextFromFeedback);
+        result.put("clean_text", cleanText);
+        result.put("spoken_text", spokenText);
+        result.put("spoken_lines", toJsArray(splitLines(spokenText)));
+        result.put("syllabified_expected_text", syllabifiedExpectedText);
+        result.put("syllabified_spoken_text", syllabifiedSpokenText);
+        result.put("feedback_comment", feedbackComment);
+        result.put("comparison_summary", comparisonSummary);
+        result.put("positive_feedback", positiveFeedback);
+        result.put("improvement_tip", improvementTip);
+        result.put("issues", issues);
+        result.put("raw", rawFeedback.trim().isEmpty() ? rawTranscription : rawFeedback);
+        result.put("raw_transcription", rawTranscription);
+        result.put("raw_feedback", rawFeedback);
+
+        JSObject meta = new JSObject();
+        meta.put("source", "mobile");
+        meta.put("engine", runtime.getName());
+        meta.put("mode", "audio-gemma-local-transcribe-then-feedback-v2-single-comment");
+
+        result.put("meta", meta);
+
+        return result;
     }
 
-    Log.i(TAG, "Resposta bruta do áudio:\n" + raw);
-
-    JSObject parsed = parseModelJson(raw);
-
-    String transcription = safe(parsed.optString("transcription", ""), "");
-    String cleanText = safe(parsed.optString("clean_text", ""), transcription);
-
-    if (cleanText.trim().isEmpty()) {
-        cleanText = safe(expectedText, transcription);
+    private String buildAudioTranscriptionOnlyPrompt() {
+        return "Transcreve o áudio em português europeu.\n" +
+                "Regras obrigatórias:\n" +
+                "- Escreve apenas o que foi dito no áudio.\n" +
+                "- Não corrijas a frase.\n" +
+                "- Não inventes palavras.\n" +
+                "- Não uses nenhuma frase esperada, porque nesta etapa não existe frase esperada.\n" +
+                "- Se não perceberes alguma palavra, escreve a aproximação que ouviste.\n" +
+                "- Responde apenas em JSON válido, sem markdown.\n" +
+                "Formato obrigatório: {\"transcription\":\"texto dito no áudio\"}";
     }
 
-    JSArray issues = extractIssues(parsed);
+    private String buildAudioReadingFeedbackPrompt(String expectedText, String spokenTranscription) {
+        String expected = safe(expectedText, "");
+        String spoken = safe(spokenTranscription, "");
 
-    Log.i(TAG, "processAudio() -> transcription=" + transcription);
-    Log.i(TAG, "processAudio() -> clean_text=" + cleanText);
-    Log.i(TAG, "processAudio() -> issues count=" + issues.length());
+        return "És um assistente de leitura para crianças com dislexia.\n" +
+                "Agora NÃO vais ouvir áudio. Vais comparar duas frases já escritas.\n" +
+                "Responde sempre em português de Portugal. Usa sempre 'tu' e nunca 'você'.\n\n" +
 
-    JSObject result = new JSObject();
-    result.put("success", true);
-    result.put("transcription", transcription);
-    result.put("clean_text", cleanText);
-    result.put("spoken_text", cleanText);
-    result.put("spoken_lines", toJsArray(splitLines(cleanText)));
-    result.put("issues", issues);
-    result.put("raw", raw);
+                "Frase original:\n" + expected + "\n\n" +
+                "Frase transcrita da voz da criança:\n" + spoken + "\n\n" +
 
-    JSObject meta = new JSObject();
-    meta.put("source", "mobile");
-    meta.put("engine", runtime.getName());
-    meta.put("mode", "audio-gemma-local");
+                "Tarefa:\n" +
+                "1. Mantém exatamente a frase original em expected_text.\n" +
+                "2. Mantém exatamente a frase transcrita em spoken_text.\n" +
+                "3. Divide a frase original em sílabas.\n" +
+                "4. Divide a frase transcrita em sílabas, se for legível.\n" +
+                "5. Escreve UM comentário curto, simples e correto para a criança ouvir.\n\n" +
 
-    result.put("meta", meta);
+                "Regras para o comentário:\n" +
+                "- Diz claramente se a frase está correta ou não.\n" +
+                "- Se estiver correta, elogia de forma simples.\n" +
+                "- Se estiver incorreta, identifica exatamente o que mudou.\n" +
+                "- Não digas que está correta se houver palavras diferentes, palavras a mais ou palavras em falta.\n" +
+                "- Não contradigas a comparação.\n" +
+                "- Usa frases curtas.\n" +
+                "- Não uses termos técnicos.\n" +
+                "- O comentário deve poder ser ouvido em voz alta por uma criança.\n\n" +
 
-    return result;
-}
+                "Regras para a divisão silábica:\n" +
+                "- Mantém os espaços entre palavras.\n" +
+                "- Usa hífen apenas dentro das palavras.\n" +
+                "- Nunca juntes palavras diferentes com hífen.\n" +
+                "- Não separes ditongos finais.\n" +
+                "- As terminações 'eu', 'éu', 'iu', 'ou', 'ai', 'ei', 'oi', 'ui', 'ão', 'ãe' devem ficar juntas quando pertencem à mesma sílaba.\n" +
+                "- Se a frase transcrita estiver ilegível ou incompleta, deixa syllabified_spoken_text vazio.\n\n" +
+
+                "Exemplos corretos:\n" +
+                "gato -> ga-to\n" +
+                "rato -> ra-to\n" +
+                "comeu -> co-meu\n" +
+                "meu -> meu\n" +
+                "deu -> deu\n" +
+                "céu -> céu\n" +
+                "não -> não\n" +
+                "menina -> me-ni-na\n" +
+                "computador -> com-pu-ta-dor\n" +
+                "O gato comeu o rato. -> O ga-to co-meu o ra-to.\n\n" +
+
+                "Exemplos errados:\n" +
+                "comeu -> co-me-u\n" +
+                "meu -> me-u\n" +
+                "deu -> de-u\n" +
+                "não -> nã-o\n" +
+                "O gato comeu o rato. -> O-ga-to-co-me-u-o-ra-to\n\n" +
+
+                "Antes de responder, verifica:\n" +
+                "- se não escreveste 'co-me-u'; se escreveste, corrige para 'co-meu'.\n" +
+                "- se não juntaste palavras diferentes com hífen.\n" +
+                "- se o comentário diz claramente se a leitura está correta ou não.\n\n" +
+
+                "Responde APENAS em JSON válido, sem markdown, sem ```json.\n\n" +
+
+                "{\n" +
+                "  \"expected_text\": \"frase original\",\n" +
+                "  \"syllabified_expected_text\": \"frase original dividida em sílabas\",\n" +
+                "  \"spoken_text\": \"frase transcrita\",\n" +
+                "  \"syllabified_spoken_text\": \"frase transcrita dividida em sílabas ou vazio se não for legível\",\n" +
+                "  \"feedback_comment\": \"comentário único, simples, correto e dirigido à criança\",\n" +
+                "  \"issues\": [\n" +
+                "    { \"type\": \"correta|omissão|troca|palavra_a_mais|pronúncia|ordem|outro\", \"expected\": \"...\", \"spoken\": \"...\", \"comment\": \"explicação simples\" }\n" +
+                "  ]\n" +
+                "}";
+    }
+
+    private String extractLikelyPlainTranscription(String raw) {
+        String text = cleanModelText(raw);
+        JSObject parsed = parseModelJson(text);
+        String fromJson = safe(parsed.optString("transcription", ""), "");
+        if (!fromJson.trim().isEmpty()) return cleanModelText(fromJson);
+
+        text = text
+                .replaceFirst("(?is)^```json\\s*", "")
+                .replaceFirst("(?is)^```\\s*", "")
+                .replaceFirst("(?is)```\\s*$", "")
+                .replaceFirst("(?is)^json\\s*", "")
+                .trim();
+
+        int colon = text.indexOf(':');
+        if (text.toLowerCase().contains("transcription") && colon >= 0 && colon < text.length() - 1) {
+            text = text.substring(colon + 1).trim();
+        }
+
+        return cleanModelText(text);
+    }
+
+    private String cleanModelText(String value) {
+        String text = safe(value, "").trim();
+        text = text
+                .replaceFirst("(?is)^```json\\s*", "")
+                .replaceFirst("(?is)^```\\s*", "")
+                .replaceFirst("(?is)```\\s*$", "")
+                .replace("\\n", " ")
+                .replace("\\r", " ")
+                .trim();
+
+        if ((text.startsWith("\"") && text.endsWith("\"")) ||
+                (text.startsWith("'") && text.endsWith("'"))) {
+            text = text.substring(1, text.length() - 1).trim();
+        }
+
+        return text.replaceAll("\\s+", " ").trim();
+    }
 
     private JSObject buildAudioDecodeFallbackResult(String expectedText, String mimeType, int audioBytesLength, Exception error) {
-    String fallbackText = safe(expectedText, "");
+        String fallbackText = safe(expectedText, "");
 
-    if (fallbackText.trim().isEmpty()) {
-        fallbackText = "Não consegui transcrever o áudio, mas a gravação foi recebida.";
+        if (fallbackText.trim().isEmpty()) {
+            fallbackText = "Não consegui transcrever o áudio, mas a gravação foi recebida.";
+        }
+
+        JSObject result = new JSObject();
+        result.put("success", true);
+        result.put("transcription", fallbackText);
+        result.put("expected_text", fallbackText);
+        result.put("clean_text", fallbackText);
+        result.put("spoken_text", fallbackText);
+        result.put("spoken_lines", toJsArray(splitLines(fallbackText)));
+        result.put("syllabified_expected_text", fallbackText);
+        result.put("syllabified_spoken_text", fallbackText);
+        result.put("feedback_comment", "Não foi possível obter uma análise completa da leitura. Tenta gravar novamente num local silencioso.");
+        result.put("comparison_summary", "Não foi possível obter uma análise completa da leitura. Tenta gravar novamente num local silencioso.");
+        result.put("positive_feedback", "");
+        result.put("improvement_tip", "");
+        result.put("issues", new JSArray());
+
+        JSObject meta = new JSObject();
+        meta.put("source", "mobile");
+        meta.put("engine", runtime.getName());
+        meta.put("mode", "audio-decode-fallback");
+        meta.put("mimeType", safe(mimeType, ""));
+        meta.put("audioBytes", audioBytesLength);
+        meta.put("error", error == null ? "" : safe(error.getMessage(), ""));
+
+        result.put("meta", meta);
+
+        Log.w(TAG, "buildAudioDecodeFallbackResult() -> fallback usado. mimeType="
+                + mimeType + ", bytes=" + audioBytesLength);
+
+        return result;
     }
-
-    JSObject result = new JSObject();
-    result.put("success", true);
-    result.put("transcription", fallbackText);
-    result.put("clean_text", fallbackText);
-    result.put("spoken_text", fallbackText);
-    result.put("spoken_lines", toJsArray(splitLines(fallbackText)));
-    result.put("issues", new JSArray());
-
-    JSObject meta = new JSObject();
-    meta.put("source", "mobile");
-    meta.put("engine", runtime.getName());
-    meta.put("mode", "audio-decode-fallback");
-    meta.put("mimeType", safe(mimeType, ""));
-    meta.put("audioBytes", audioBytesLength);
-    meta.put("error", error == null ? "" : safe(error.getMessage(), ""));
-
-    result.put("meta", meta);
-
-    Log.w(TAG, "buildAudioDecodeFallbackResult() -> fallback usado. mimeType="
-            + mimeType + ", bytes=" + audioBytesLength);
-
-    return result;
-}
 
     private JSObject parseModelJson(String raw) {
         String text = safe(raw, "").trim();
@@ -310,6 +508,78 @@ public JSObject processAudio(Context context, String audioBase64, String mimeTyp
         return result;
     }
 
+    private byte[] optimizeImageBytesForInference(byte[] imageBytes) {
+        if (imageBytes == null || imageBytes.length == 0) {
+            return imageBytes == null ? new byte[0] : imageBytes;
+        }
+
+        try {
+            BitmapFactory.Options bounds = new BitmapFactory.Options();
+            bounds.inJustDecodeBounds = true;
+            BitmapFactory.decodeByteArray(imageBytes, 0, imageBytes.length, bounds);
+
+            int sourceWidth = bounds.outWidth;
+            int sourceHeight = bounds.outHeight;
+
+            if (sourceWidth <= 0 || sourceHeight <= 0) {
+                Log.w(TAG, "optimizeImageBytesForInference() -> dimensões inválidas; usar imagem original.");
+                return imageBytes;
+            }
+
+            int sampleSize = 1;
+            int longest = Math.max(sourceWidth, sourceHeight);
+            while ((longest / sampleSize) > (IMAGE_MAX_EDGE_PX * 2)) {
+                sampleSize *= 2;
+            }
+
+            BitmapFactory.Options decodeOptions = new BitmapFactory.Options();
+            decodeOptions.inSampleSize = sampleSize;
+            decodeOptions.inPreferredConfig = Bitmap.Config.ARGB_8888;
+
+            Bitmap decoded = BitmapFactory.decodeByteArray(imageBytes, 0, imageBytes.length, decodeOptions);
+            if (decoded == null) {
+                Log.w(TAG, "optimizeImageBytesForInference() -> decode falhou; usar imagem original.");
+                return imageBytes;
+            }
+
+            int width = decoded.getWidth();
+            int height = decoded.getHeight();
+            float scale = Math.min(1f, IMAGE_MAX_EDGE_PX / (float) Math.max(width, height));
+            int targetWidth = Math.max(1, Math.round(width * scale));
+            int targetHeight = Math.max(1, Math.round(height * scale));
+
+            Bitmap scaled = decoded;
+            if (targetWidth != width || targetHeight != height) {
+                scaled = Bitmap.createScaledBitmap(decoded, targetWidth, targetHeight, true);
+            }
+
+            ByteArrayOutputStream output = new ByteArrayOutputStream();
+            scaled.compress(Bitmap.CompressFormat.JPEG, IMAGE_JPEG_QUALITY, output);
+            byte[] optimized = output.toByteArray();
+
+            if (scaled != decoded) {
+                scaled.recycle();
+            }
+            decoded.recycle();
+
+            Log.i(TAG, "optimizeImageBytesForInference() -> original=" + sourceWidth + "x" + sourceHeight +
+                    ", decoded=" + width + "x" + height +
+                    ", final=" + targetWidth + "x" + targetHeight +
+                    ", sampleSize=" + sampleSize +
+                    ", quality=" + IMAGE_JPEG_QUALITY +
+                    ", bytes=" + imageBytes.length + "->" + optimized.length);
+
+            return optimized.length > 0 ? optimized : imageBytes;
+        } catch (Exception e) {
+            Log.w(TAG, "optimizeImageBytesForInference() -> falhou; usar imagem original.", e);
+            return imageBytes;
+        }
+    }
+
+    private long elapsedMs(long startNanos) {
+        return (System.nanoTime() - startNanos) / 1_000_000L;
+    }
+
     private byte[] decodeBase64Payload(String base64Payload) {
         String normalized = base64Payload == null ? "" : base64Payload.trim();
         int commaIndex = normalized.indexOf(',');
@@ -402,16 +672,6 @@ public JSObject processAudio(Context context, String audioBase64, String mimeTyp
         return result;
     }
 
-    private String cleanModelText(String text) {
-        String cleaned = text == null ? "" : text.trim();
-        cleaned = cleaned.replaceAll("^```(?:json|text)?\\s*", "").replaceAll("```$", "").trim();
-        cleaned = cleaned.replaceAll("^([Oo]riginal|[Tt]exto(?: extra[ií]do)?|[Rr]esposta|[Ss]implificado)\\s*[:：]\\s*", "").trim();
-        cleaned = cleaned.replaceAll("^\"|\"$", "").trim();
-        cleaned = cleaned.replaceAll("\\s+\\n", "\n");
-        cleaned = cleaned.replaceAll("[ \\t]+", " ").trim();
-        return cleaned;
-    }
-
     private JSArray toJsArray(List<String> items) {
         JSArray array = new JSArray();
         for (String item : items) {
@@ -480,8 +740,55 @@ public JSObject processAudio(Context context, String audioBase64, String mimeTyp
                 return recovered;
             }
 
+            JSObject labeled = parseImageLabeledResult(raw);
+            if (labeled != null) {
+                Log.w(TAG, "parseImageFullResult() -> resposta recuperada a partir de formato ORIGINAL/SIMPLIFICADO.");
+                return labeled;
+            }
+
             throw new Exception("O modelo devolveu uma resposta de imagem inválida.");
         }
+    }
+
+    private JSObject parseImageLabeledResult(String raw) {
+        String text = cleanModelText(raw);
+        if (text.trim().isEmpty()) return null;
+
+        String lower = text.toLowerCase();
+        int originalIndex = lower.indexOf("original:");
+        int simplifiedIndex = lower.indexOf("simplificado:");
+
+        if (originalIndex < 0 || simplifiedIndex < 0 || simplifiedIndex <= originalIndex) {
+            return null;
+        }
+
+        String originalText = text
+                .substring(originalIndex + "original:".length(), simplifiedIndex)
+                .trim();
+        String simplifiedText = text
+                .substring(simplifiedIndex + "simplificado:".length())
+                .trim();
+
+        originalText = cleanModelText(originalText);
+        simplifiedText = cleanModelText(simplifiedText);
+
+        if (originalText.isEmpty()) return null;
+        if (simplifiedText.isEmpty()) simplifiedText = originalText;
+
+        JSObject result = new JSObject();
+        result.put("success", true);
+        result.put("original_text", originalText);
+        result.put("simplified_text", simplifiedText);
+        result.put("original_lines", toJsArray(splitLines(originalText)));
+        result.put("simplified_lines", toJsArray(splitLines(simplifiedText)));
+
+        JSObject meta = new JSObject();
+        meta.put("source", "mobile");
+        meta.put("engine", runtime.getName());
+        meta.put("mode", "image-one-pass-labeled");
+
+        result.put("meta", meta);
+        return result;
     }
 
     private JSObject recoverImageFullResult(String raw) {
@@ -573,10 +880,9 @@ public JSObject processAudio(Context context, String audioBase64, String mimeTyp
     }
 
     private String buildImageFullPrompt() {
-        return "Extract the visible text from this image. " +
-                "Then rewrite it in simpler European Portuguese. " +
-                "Return only this valid JSON: " +
-                "{\"original_text\":\"...\",\"simplified_text\":\"...\"}";
+        return "Transcreve o texto visível na imagem e cria uma versão simplificada para dislexia em português europeu.\n" +
+                "Responde só neste formato curto:\n" +
+                "ORIGINAL: texto transcrito\n" +
+                "SIMPLIFICADO: texto simplificado";
     }
-
 }

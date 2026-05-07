@@ -63,6 +63,7 @@
         :active-flow="activeFlow"
         :active-word-style="activeWordStyle"
         :audio-issues="audioIssues"
+        :audio-feedback-text="audioFeedbackText"
         :computed-line-font-size="computedLineFontSize"
         :computed-word-context-font-size="computedWordContextFontSize"
         :current-line-index="currentLineIndex"
@@ -170,6 +171,9 @@ const readingAgeGroup = ref('8-10')
 const readingLevel = ref('1')
 const readingType = ref('simple_sentence')
 const audioIssues = ref([])
+const audioComparisonSummary = ref('')
+const audioPositiveFeedback = ref('')
+const audioImprovementTip = ref('')
 const isGeneratingPhrase = ref(false)
 const isRecording = ref(false)
 const isRecorderBusy = ref(false)
@@ -199,7 +203,7 @@ const imageInput = ref(null)
 const audioInput = ref(null)
 
 const readingPalette = ref('yellow')
-const fontSize = ref(24)
+const fontSize = ref(18)
 const readingMode = ref('line')
 const currentTextMode = ref('simplified')
 const wordAudioMode = ref('silent')
@@ -239,6 +243,17 @@ const spokenLines = ref([])
 const hasSpokenText = computed(() => spokenLines.value.length > 0 || !!spokenText.value)
 const hasRecordedAudio = computed(() => !!selectedAudioFile.value)
 
+const audioFeedbackText = computed(() => {
+  return [
+    audioComparisonSummary.value,
+    audioPositiveFeedback.value,
+    audioImprovementTip.value,
+  ]
+    .map(part => cleanAudioText(part))
+    .filter(Boolean)
+    .join(' ')
+})
+
 const currentLines = computed(() => {
   if (currentTextMode.value === 'spoken') return spokenLines.value
   return currentTextMode.value === 'original' ? originalLines.value : simplifiedLines.value
@@ -269,9 +284,24 @@ const lineProgressPercent = computed(() => {
   return ((currentLineIndex.value + 1) / currentLines.value.length) * 100
 })
 
-const computedLineFontSize = computed(() => isLandscape.value ? Math.max(18, Math.min(fontSize.value - 4, 24)) : Math.max(20, Math.min(fontSize.value, 26)))
-const computedWordContextFontSize = computed(() => isLandscape.value ? Math.max(15, Math.min(fontSize.value - 8, 19)) : Math.max(18, Math.min(fontSize.value - 5, 22)))
-const activeWordStyle = computed(() => isLandscape.value ? { fontSize: '1.08em', transform: 'translateY(-1px)' } : { fontSize: '1.24em', transform: 'translateY(-1px)' })
+const currentLineTextLength = computed(() => String(currentLines.value[currentLineIndex.value] || '').length)
+const longLineFontReduction = computed(() => {
+  const length = currentLineTextLength.value
+  if (length > 140) return 6
+  if (length > 100) return 5
+  if (length > 70) return 4
+  if (length > 48) return 2
+  return 0
+})
+const computedLineFontSize = computed(() => {
+  const base = isLandscape.value ? Math.max(14, Math.min(fontSize.value - 2, 18)) : Math.max(15, Math.min(fontSize.value, 20))
+  return Math.max(isLandscape.value ? 12 : 14, base - longLineFontReduction.value)
+})
+const computedWordContextFontSize = computed(() => {
+  const base = isLandscape.value ? Math.max(12, Math.min(fontSize.value - 5, 15)) : Math.max(13, Math.min(fontSize.value - 3, 17))
+  return Math.max(isLandscape.value ? 11 : 12, base - Math.ceil(longLineFontReduction.value / 2))
+})
+const activeWordStyle = computed(() => isLandscape.value ? { fontSize: '1em' } : { fontSize: '1.04em' })
 
 watch(currentLineIndex, () => { currentWordIndex.value = 0 })
 watch(readingMode, () => {
@@ -306,12 +336,52 @@ function startImageFlow() {
   previewUrl.value = ''
   setScreen('select-image-source')
 }
-
 async function setSelectedImageFromDataUrl(dataUrl, mimeType = 'image/jpeg') {
-  const preparedImage = await optimizeImageForInference(dataUrl)
+  console.log('[DyslexAI] Imagem recebida no frontend:', {
+    mimeType,
+    estimatedSizeKb: Math.round((dataUrl?.length || 0) / 1024),
+  })
+
+  let preparedImage
+
+  if (isNativeAndroid()) {
+    try {
+      const result = await DyslexAIPlugin.prepareImage({
+        imageBase64: dataUrl,
+        mode: 'balanced',
+      })
+
+      console.log('[DyslexAI] Pré-processamento Android concluído:', {
+        mode: result.mode,
+        original: `${result.originalWidth}x${result.originalHeight}`,
+        decoded: `${result.decodedWidth}x${result.decodedHeight}`,
+        crop: `${result.cropWidth}x${result.cropHeight}`,
+        final: `${result.finalWidth}x${result.finalHeight}`,
+        inputSizeKb: result.inputSizeKb,
+        finalSizeKb: result.finalSizeKb,
+        jpegQuality: result.jpegQuality,
+        elapsedMs: result.elapsedMs,
+      })
+
+      preparedImage = {
+        dataUrl: result.imageBase64,
+        mimeType: result.mimeType || 'image/jpeg',
+      }
+    } catch (error) {
+      console.warn('[DyslexAI] Falhou pré-processamento Android. A usar fallback Canvas.', error)
+      preparedImage = await optimizeImageForInference(dataUrl)
+    }
+  } else {
+    preparedImage = await optimizeImageForInference(dataUrl)
+  }
+
+  console.log('[DyslexAI] Imagem final guardada para inferência:', {
+    mimeType: preparedImage.mimeType,
+    estimatedSizeKb: Math.round((preparedImage.dataUrl?.length || 0) / 1024),
+  })
 
   selectedImageBase64.value = preparedImage.dataUrl
-  selectedImageMimeType.value = preparedImage.mimeType
+  selectedImageMimeType.value = preparedImage.mimeType || mimeType || 'image/jpeg'
 
   if (previewUrl.value) URL.revokeObjectURL(previewUrl.value)
   previewUrl.value = preparedImage.dataUrl
@@ -319,7 +389,6 @@ async function setSelectedImageFromDataUrl(dataUrl, mimeType = 'image/jpeg') {
   selectedFile.value = { name: 'imagem-selecionada', type: selectedImageMimeType.value }
   setScreen('confirm-image')
 }
-
 function optimizeImageForInference(dataUrl) {
   return new Promise((resolve) => {
     const image = new Image()
@@ -353,11 +422,13 @@ function optimizeImageForInference(dataUrl) {
 
       const optimizedDataUrl = canvas.toDataURL('image/jpeg', imageOptimizationQuality)
 
-      console.log('[DyslexAI] Imagem otimizada para inferência:', {
-        originalSize: dataUrl.length,
-        optimizedSize: optimizedDataUrl.length,
+      console.log('[DyslexAI] Imagem otimizada por Canvas:', {
+        originalSizeKb: Math.round(dataUrl.length / 1024),
+        optimizedSizeKb: Math.round(optimizedDataUrl.length / 1024),
         originalDimensions: `${sourceWidth}x${sourceHeight}`,
         optimizedDimensions: `${targetWidth}x${targetHeight}`,
+        maxEdge: imageOptimizationMaxEdge,
+        quality: imageOptimizationQuality,
       })
 
       resolve({ dataUrl: optimizedDataUrl, mimeType: 'image/jpeg' })
@@ -375,11 +446,12 @@ function optimizeImageForInference(dataUrl) {
 async function takePhoto() {
   try {
     const image = await Camera.getPhoto({
-      quality: 75,
-      width: 1000,
+      quality: 90,
+      width: 1800,
       resultType: CameraResultType.DataUrl,
       source: CameraSource.Camera,
       allowEditing: false,
+      correctOrientation: true,
     })
 
     if (!image.dataUrl) throw new Error('A fotografia não devolveu dados.')
@@ -397,11 +469,12 @@ async function takePhoto() {
 async function pickFromGallery() {
   try {
     const image = await Camera.getPhoto({
-      quality: 75,
-      width: 1000,
+      quality: 90,
+      width: 2200,
       resultType: CameraResultType.DataUrl,
       source: CameraSource.Photos,
       allowEditing: false,
+      correctOrientation: true,
     })
 
     if (!image.dataUrl) throw new Error('A imagem não devolveu dados.')
@@ -420,6 +493,7 @@ async function startAudioFlow() {
   activeFlow.value = 'audio'
   clearRecordedAudio()
   audioIssues.value = []
+  clearAudioFeedback()
   spokenText.value = ''
   spokenTranscription.value = ''
   expectedReadingText.value = ''
@@ -615,6 +689,7 @@ function clearRecordedAudio() {
   isRecorderBusy.value = false
   recordedChunks = []
   audioIssues.value = []
+  clearAudioFeedback()
 }
 
 async function generateReadingPhrase() {
@@ -623,6 +698,7 @@ async function generateReadingPhrase() {
     expectedReadingText.value = ''
     clearRecordedAudio()
     audioIssues.value = []
+    clearAudioFeedback()
     spokenText.value = ''
     spokenTranscription.value = ''
 
@@ -719,6 +795,9 @@ async function processRealAudio(file) {
     ? normalized.spoken_lines
     : (spokenText.value ? [spokenText.value] : [])
   audioIssues.value = normalized.issues
+  audioComparisonSummary.value = normalized.comparison_summary
+  audioPositiveFeedback.value = normalized.positive_feedback
+  audioImprovementTip.value = normalized.improvement_tip
 
   correctedText.value = expectedReadingText.value || spokenText.value
   originalLines.value = correctedText.value ? [correctedText.value] : []
@@ -749,6 +828,9 @@ function normalizeAudioResult(data = {}) {
       spokenTextValue || cleanText || transcription
     ),
     issues: normalizeAudioIssues(result.issues),
+    comparison_summary: cleanAudioText(result.comparison_summary || ''),
+    positive_feedback: cleanAudioText(result.positive_feedback || ''),
+    improvement_tip: cleanAudioText(result.improvement_tip || ''),
   }
 }
 
@@ -778,6 +860,12 @@ function cleanAudioText(value) {
     .replace(/```$/i, '')
     .replace(/^json\s*/i, '')
     .trim()
+}
+
+function clearAudioFeedback() {
+  audioComparisonSummary.value = ''
+  audioPositiveFeedback.value = ''
+  audioImprovementTip.value = ''
 }
 
 function normalizeAudioLines(lines, fallbackText) {
@@ -1158,6 +1246,7 @@ function resetAll() {
   simplifiedText.value = ''
   spokenText.value = ''
   spokenTranscription.value = ''
+  clearAudioFeedback()
   originalLines.value = []
   simplifiedLines.value = []
   spokenLines.value = []
@@ -1599,7 +1688,7 @@ audio {
 
 .reading-focus {
   width: 100%;
-  text-align: center;
+  text-align: justify;
 }
 
 .line-focus {
@@ -1607,6 +1696,8 @@ audio {
   margin: 0 auto;
   line-height: 1.5;
   font-weight: 700;
+  text-align: justify;
+  text-align-last: left;
 }
 
 .word-focus {
@@ -1615,16 +1706,17 @@ audio {
 }
 
 .word-context {
-  display: flex;
-  flex-wrap: wrap;
-  justify-content: center;
-  gap: 14px;
+  display: block;
+  text-align: justify;
+  text-align-last: left;
 }
 
 .word-chip {
-  padding: 12px 18px;
-  border-radius: 999px;
-  background: rgba(255, 255, 255, 0.08);
+  display: inline;
+  margin-right: .2em;
+  padding: 0 .08em;
+  border-radius: 3px;
+  background: transparent;
   transition: all 0.2s ease;
   font-weight: 700;
 }
@@ -1697,6 +1789,10 @@ audio {
   gap: 10px;
   color: #111827;
   font-weight: 600;
+  grid-column: 1 / -1;
+  justify-content: center;
+  width: 100%;
+  white-space: nowrap;
 }
 
 .modal-overlay {
@@ -1741,6 +1837,17 @@ audio {
   border: 1px solid #e5e7eb;
   padding: 16px;
   color: #111827;
+  font-size: .95rem;
+  line-height: 1.35;
+  overflow-wrap: anywhere;
+}
+
+@media (orientation: landscape) and (max-height: 620px) {
+  .text-output {
+    font-size: .86rem !important;
+    line-height: 1.28 !important;
+    min-height: 180px !important;
+  }
 }
 
 @media (max-width: 820px) {
@@ -2415,8 +2522,8 @@ button, select, input, textarea, audio { font:inherit; }
 .player-corner { top:18px; }
 .corner-btn, .round-btn, .play-btn { width:46px; height:46px; border:1px solid #e5eaf2; background:#fff; color:#344054; box-shadow:0 5px 12px rgba(15,23,42,.05); }
 .play-btn { background:#1a73e8; border-color:#1a73e8; color:#fff; }
-.line-focus { max-width:760px; font-weight:800; color:#101828 !important; line-height:1.18; letter-spacing:-.03em; }
-.word-chip { background:#fff; border:1px solid #e5eaf2; color:#344054; }
+.line-focus { max-width:none; width:100%; font-weight:800; color:#101828 !important; line-height:1.22; letter-spacing:0; text-align:justify; text-align-last:left; }
+.word-chip { background:transparent; border:0; color:#344054; padding:0 .08em; border-radius:3px; box-shadow:none; }
 .reader-bottom { max-height:calc(54dvh - 24px); overflow:auto; display:grid; gap:12px; }
 .transport-row { gap:14px; }
 .progress-line { height:5px; background:#d7dee9; }
@@ -6626,6 +6733,15 @@ body,
   font-size: .78rem !important;
 }
 
+.reader-home:not(.speech-result-home) .check-block {
+  grid-column: 1 / -1 !important;
+  width: 100% !important;
+  justify-content: center !important;
+  white-space: nowrap !important;
+  font-size: .78rem !important;
+  line-height: 1.1 !important;
+}
+
 /* ===== TYPOGRAPHY FINAL — mesma escala em todas as orientacoes ===== */
 .google-home .home-brand-title {
   font-size: clamp(1.12rem, 3.8vw, 1.42rem) !important;
@@ -7474,5 +7590,164 @@ body,
   font-size: 1.38rem !important;
   line-height: 1 !important;
   font-weight: 760 !important;
+}
+
+/* ===== RESPONSIVE SAFETY PASS — Android landscape/small screens =====
+   Mantem a UI dentro do viewport e evita que controlos fixos roubem espaco
+   aos ecras finais. */
+.home-bottom-nav--empty {
+  display: none !important;
+}
+
+.reader-home,
+.speech-home,
+.review-home {
+  grid-template-rows: auto minmax(0, 1fr) !important;
+}
+
+.reader-home .google-home-main,
+.speech-home .google-home-main,
+.review-home .google-home-main {
+  min-height: 0 !important;
+  overflow: hidden !important;
+}
+
+.reader-home.settings-open:not(.speech-result-home) .reader-main {
+  display: grid !important;
+  grid-template-columns: minmax(0, 1fr) !important;
+  grid-template-rows: minmax(96px, 1fr) minmax(0, auto) !important;
+}
+
+.reader-home.settings-open:not(.speech-result-home) .reader-top {
+  min-height: 0 !important;
+  height: auto !important;
+  overflow: auto !important;
+  -webkit-overflow-scrolling: touch !important;
+}
+
+.reader-home.settings-open:not(.speech-result-home) .reader-bottom {
+  align-self: end !important;
+  max-height: min(50dvh, 260px) !important;
+  overflow-y: auto !important;
+  overflow-x: hidden !important;
+  -webkit-overflow-scrolling: touch !important;
+}
+
+.reader-home.settings-open:not(.speech-result-home) .controls-compact {
+  display: grid !important;
+  grid-template-columns: repeat(auto-fit, minmax(88px, 1fr)) !important;
+  gap: clamp(4px, 1.1vw, 8px) !important;
+}
+
+.reader-home.settings-open:not(.speech-result-home) .settings-panel {
+  display: grid !important;
+  grid-template-columns: repeat(auto-fit, minmax(120px, 1fr)) !important;
+}
+
+.reader-home.settings-open:not(.speech-result-home) .check-block {
+  grid-column: 1 / -1 !important;
+  justify-content: center !important;
+  white-space: normal !important;
+  text-align: center !important;
+}
+
+.speech-result-home .reader-main {
+  display: grid !important;
+  grid-template-columns: minmax(0, 1fr) !important;
+  grid-template-rows: minmax(0, 1fr) !important;
+}
+
+.speech-result-home .speech-result-panel {
+  width: 100% !important;
+  max-width: none !important;
+  min-height: 0 !important;
+  height: 100% !important;
+  align-self: stretch !important;
+  justify-self: stretch !important;
+  overflow: hidden !important;
+}
+
+.speech-result-home .result-phrase-card {
+  min-width: 0 !important;
+  min-height: 0 !important;
+  overflow: hidden !important;
+}
+
+.speech-result-home .result-phrase-copy strong {
+  overflow-wrap: anywhere !important;
+}
+
+@media (orientation: landscape) and (max-height: 620px) {
+  .google-home-header {
+    padding-top: max(4px, env(safe-area-inset-top)) !important;
+    padding-bottom: 2px !important;
+  }
+
+  .reader-home.settings-open:not(.speech-result-home) .reader-main {
+    grid-template-rows: minmax(72px, 1fr) minmax(0, auto) !important;
+    gap: 4px !important;
+    padding-top: 2px !important;
+    padding-bottom: 4px !important;
+  }
+
+  .reader-home.settings-open:not(.speech-result-home) .reader-bottom {
+    max-height: min(58dvh, 230px) !important;
+    padding-top: 4px !important;
+    padding-bottom: max(4px, env(safe-area-inset-bottom)) !important;
+  }
+
+  .reader-home.settings-open:not(.speech-result-home) .line-focus,
+  .reader-home.settings-open:not(.speech-result-home) .word-context {
+    line-height: 1.18 !important;
+  }
+
+  .reader-home.settings-open:not(.speech-result-home) .pill-btn {
+    min-height: 28px !important;
+    padding: 4px 7px !important;
+    font-size: clamp(.66rem, 1.35vw, .78rem) !important;
+  }
+
+  .reader-home.settings-open:not(.speech-result-home) .settings-panel {
+    gap: 4px !important;
+    padding: 5px !important;
+  }
+
+  .reader-home.settings-open:not(.speech-result-home) .setting-block,
+  .reader-home.settings-open:not(.speech-result-home) .setting-block label,
+  .reader-home.settings-open:not(.speech-result-home) .setting-block select,
+  .reader-home.settings-open:not(.speech-result-home) .setting-block input {
+    font-size: clamp(.64rem, 1.2vw, .72rem) !important;
+  }
+
+  .speech-result-home .reader-main {
+    padding: 4px clamp(12px, 2.4vw, 24px) 6px !important;
+  }
+
+  .speech-result-home .speech-result-panel {
+    grid-template-rows: repeat(2, minmax(0, 1fr)) auto !important;
+    gap: 8px !important;
+  }
+
+  .speech-result-home .result-phrase-card {
+    padding: 10px 12px !important;
+  }
+}
+
+@media (orientation: landscape) and (max-height: 460px) {
+  .reader-home.settings-open:not(.speech-result-home) .reader-main {
+    grid-template-rows: minmax(56px, 1fr) minmax(0, auto) !important;
+  }
+
+  .reader-home.settings-open:not(.speech-result-home) .reader-bottom {
+    max-height: 64dvh !important;
+  }
+
+  .reader-home.settings-open:not(.speech-result-home) .controls-compact {
+    grid-template-columns: repeat(auto-fit, minmax(76px, 1fr)) !important;
+  }
+
+  .reader-home.settings-open:not(.speech-result-home) .settings-panel {
+    grid-template-columns: repeat(auto-fit, minmax(100px, 1fr)) !important;
+  }
 }
 </style>

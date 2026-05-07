@@ -24,6 +24,7 @@ import java.util.concurrent.Executors;
 import om.dyslexai.app.inference.DyslexAIEngine;
 import om.dyslexai.app.inference.LocalModelRuntime;
 import om.dyslexai.app.inference.RuntimeFactory;
+import om.dyslexai.app.inference.ImagePreprocessor;
 
 @CapacitorPlugin(
         name = "DyslexAI",
@@ -89,6 +90,42 @@ public class DyslexAIPlugin extends Plugin {
             }
         });
     }
+@PluginMethod
+public void prepareImage(PluginCall call) {
+    String imageBase64 = call.getString("imageBase64");
+    String mode = call.getString("mode", "balanced");
+
+    Log.i(TAG, "prepareImage() chamado. mode=" + mode +
+            ", input length=" + (imageBase64 == null ? 0 : imageBase64.length()));
+
+    if (imageBase64 == null || imageBase64.trim().isEmpty()) {
+        Log.w(TAG, "prepareImage() -> imagem vazia.");
+        call.reject("Imagem vazia.");
+        return;
+    }
+
+    executor.execute(() -> {
+        try {
+            JSObject result = ImagePreprocessor.prepare(imageBase64, mode);
+
+            Log.i(TAG, "prepareImage() -> concluído.");
+            Log.i(TAG, "prepareImage() -> recebida: "
+                    + result.getInteger("originalWidth") + "x"
+                    + result.getInteger("originalHeight") + " | "
+                    + result.getInteger("inputSizeKb") + " KB");
+
+            Log.i(TAG, "prepareImage() -> final: "
+                    + result.getInteger("finalWidth") + "x"
+                    + result.getInteger("finalHeight") + " | "
+                    + result.getInteger("finalSizeKb") + " KB");
+
+            call.resolve(result);
+        } catch (Exception e) {
+            Log.e(TAG, "Erro ao preparar imagem: " + e.getMessage(), e);
+            call.reject("Erro ao preparar imagem: " + e.getMessage(), e);
+        }
+    });
+}
 
     @PluginMethod
     public void processImage(PluginCall call) {

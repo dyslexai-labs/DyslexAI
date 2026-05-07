@@ -1,10 +1,12 @@
 const mockDelayMs = 250
 
 const phraseExamples = {
-  simple_sentence: 'O gato comeu o rato.',
-  rhyme: 'A bola rola na escola.',
-  tongue_twister: 'Três tigres tristes trazem trigo.',
+  simple_sentence: 'O gato pequeno encontrou uma mochila azul no jardim da escola e caminhou devagar até à porta da sala para mostrar a todos os colegas o que tinha descoberto.',
+  rhyme: 'A bola rola na escola, passa pela mola, salta para a sacola e volta feliz para a mão da menina que canta ao sol.',
+  tongue_twister: 'Três tigres tristes trazem trigo, trocam três pratos tortos e tentam treinar tranquilamente junto ao trilho estreito.',
 }
+
+const longReadingText = 'O gato pequeno encontrou uma mochila azul no jardim da escola e caminhou devagar até à porta da sala para mostrar a todos os colegas o que tinha descoberto.'
 
 const silentWavDataUrl = 'data:audio/wav;base64,UklGRiQAAABXQVZFZm10IBAAAAABAAEAQB8AAEAfAAABAAgAZGF0YQAAAAA='
 
@@ -35,7 +37,7 @@ export function createMockInferenceProvider() {
 
     async processText(text = '') {
       await delay()
-      const cleanText = String(text || '').trim() || 'O gato comeu o rato.'
+      const cleanText = String(text || '').trim() || longReadingText
       return {
         success: true,
         original_text: cleanText,
@@ -50,10 +52,10 @@ export function createMockInferenceProvider() {
       await delay()
       return {
         success: true,
-        original_text: 'O gato comeu o rato.',
-        simplified_text: 'O gato comeu o rato.',
-        original_lines: ['O gato comeu o rato.'],
-        simplified_lines: ['O gato comeu o rato.'],
+        original_text: longReadingText,
+        simplified_text: longReadingText,
+        original_lines: [longReadingText],
+        simplified_lines: [longReadingText],
         meta: { source: 'mock' },
       }
     },
