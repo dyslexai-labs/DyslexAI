@@ -268,7 +268,7 @@ public class DyslexAIEngine {
         String spoken = safe(spokenTranscription, "");
 
         return "És um assistente de leitura para crianças com dislexia.\n" +
-                "Agora NÃO vais ouvir áudio. Vais comparar duas frases já escritas.\n" +
+                "Vais comparar duas frases já escritas.\n" +
                 "Responde sempre em português de Portugal. Usa sempre 'tu' e nunca 'você'.\n\n" +
 
                 "Frase original:\n" + expected + "\n\n" +
@@ -284,7 +284,7 @@ public class DyslexAIEngine {
                 "Regras para o comentário:\n" +
                 "- Diz claramente se a frase está correta ou não.\n" +
                 "- Se estiver correta, elogia de forma simples.\n" +
-                "- Se estiver incorreta, identifica exatamente o que mudou.\n" +
+                "- Se estiver incorreta, identifica todos as diferenças entre as frases.\n" +
                 "- Não digas que está correta se houver palavras diferentes, palavras a mais ou palavras em falta.\n" +
                 "- Não contradigas a comparação.\n" +
                 "- Usa frases curtas.\n" +

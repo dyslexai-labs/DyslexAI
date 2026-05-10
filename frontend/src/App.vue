@@ -1,12 +1,73 @@
 <template>
-  <div class="player-app" :class="{ fullscreen: isFullscreen }">
+  <div class="player-app" :class="[viewportClasses, { 'is-entry-screen': screen === 'home', 'is-app-screen': screen !== 'home' }]">
     <main class="app-shell">
-      <HomeView
-        v-if="screen === 'home'"
-        @start-image="startImageFlow"
-        @start-audio="startAudioFlow"
-        @go-home="goHome"
-      />
+      <section v-if="screen === 'home'" class="app-entry-view" aria-label="Entrada">
+        <header class="app-entry-header">
+          <div class="app-entry-brand">
+            <div class="app-entry-logo" aria-hidden="true">
+              <span class="app-entry-logo-blue"></span>
+              <span class="app-entry-logo-red"></span>
+              <span class="app-entry-logo-yellow"></span>
+              <span class="app-entry-logo-green"></span>
+            </div>
+            <div class="app-entry-brand-copy">
+              <div class="app-entry-brand-title">Dyslex<span>AI</span></div>
+              <div class="app-entry-brand-subtitle">Leitor guiado</div>
+            </div>
+          </div>
+
+          <button class="app-entry-home-button" title="Início" aria-label="Início" @click="goHome">
+            <svg viewBox="0 0 24 24" aria-hidden="true">
+              <path d="M4 10.5 12 4l8 6.5V20a1 1 0 0 1-1 1h-5v-6h-4v6H5a1 1 0 0 1-1-1z" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round" />
+            </svg>
+          </button>
+        </header>
+
+        <main class="app-entry-main">
+          <section class="app-entry-intro">
+            <div class="app-entry-badge">👋 Bem-vindo(a)!</div>
+            <h1>Escolhe como queres começar</h1>
+            <p>Escolhe uma imagem ou grava a tua voz. Depois lê com ajuda, passo a passo.</p>
+          </section>
+
+          <section class="app-entry-options" aria-label="Modos de leitura">
+            <button class="app-entry-option app-entry-option-blue" @click="startImageFlow">
+              <div class="app-entry-option-icon" aria-hidden="true">
+                <svg viewBox="0 0 96 96" role="img" focusable="false">
+                  <rect x="6" y="8" width="84" height="80" rx="18" fill="#dff1ff" />
+                  <circle cx="68" cy="30" r="9" fill="#fbbc04" />
+                  <path d="M12 70l23-27 18 20 11-13 20 20v10H12z" fill="#34a853" />
+                  <path d="M12 69l26-31 24 31z" fill="#2f80ed" opacity=".9" />
+                  <path d="M42 69l19-23 24 23z" fill="#1a73e8" opacity=".78" />
+                  <path d="M16 34c7-11 21-11 28 0 6-5 15-3 19 4H16z" fill="#fff" opacity=".92" />
+                </svg>
+              </div>
+              <div class="app-entry-option-copy">
+                <strong>Leitura assistida</strong>
+                <span>Usa uma imagem ou texto para preparar a leitura.</span>
+              </div>
+              <div class="app-entry-option-arrow" aria-hidden="true">&gt;</div>
+            </button>
+
+            <button class="app-entry-option app-entry-option-green" @click="startAudioFlow">
+              <div class="app-entry-option-icon" aria-hidden="true">
+                <svg viewBox="0 0 96 96" role="img" focusable="false">
+                  <rect x="6" y="8" width="84" height="80" rx="18" fill="#e5f6e8" />
+                  <rect x="37" y="18" width="22" height="42" rx="11" fill="#34a853" />
+                  <path d="M26 44c0 14 9 25 22 25s22-11 22-25" fill="none" stroke="#34a853" stroke-width="7" stroke-linecap="round" />
+                  <path d="M48 69v13M34 82h28" stroke="#34a853" stroke-width="7" stroke-linecap="round" />
+                  <path d="M61 31h8M61 43h8" stroke="#34a853" stroke-width="5" stroke-linecap="round" opacity=".75" />
+                </svg>
+              </div>
+              <div class="app-entry-option-copy">
+                <strong>Leitura a partir da fala</strong>
+                <span>Grava a fala do aluno e gera uma frase para leitura guiada.</span>
+              </div>
+              <div class="app-entry-option-arrow" aria-hidden="true">&gt;</div>
+            </button>
+          </section>
+        </main>
+      </section>
 
       <ImageSourceView
         v-else-if="screen === 'select-image-source'"
@@ -28,12 +89,14 @@
         v-model:reading-age-group="readingAgeGroup"
         v-model:reading-level="readingLevel"
         v-model:reading-type="readingType"
+        v-model:show-syllables="showSyllables"
         :audio-preview-url="audioPreviewUrl"
         :expected-reading-text="expectedReadingText"
         :has-recorded-audio="hasRecordedAudio"
         :is-generating-phrase="isGeneratingPhrase"
         :is-recorder-busy="isRecorderBusy"
         :is-recording="isRecording"
+        :recording-elapsed-label="recordingElapsedLabel"
         :selected-audio-name="selectedAudioName"
         @clear-recorded-audio="clearRecordedAudio"
         @generate-phrase="generateReadingPhrase"
@@ -79,6 +142,7 @@
         :line-progress-percent="lineProgressPercent"
         :palette-styles="paletteStyles"
         :reading-mode="readingMode"
+        :show-syllables="showSyllables"
         :spoken-text="spokenText"
         :spoken-transcription="spokenTranscription"
         :word-audio-mode="wordAudioMode"
@@ -94,6 +158,7 @@
         @speak-text="speakTextAndWait"
         @stop-all-audio="stopAllAudio"
         @switch-text-mode="switchTextMode"
+        @toggle-syllables="toggleSyllables"
         @toggle-fullscreen="toggleFullscreen"
         @toggle-line-reading="toggleLineReading"
         @toggle-word-play="toggleWordPlay"
@@ -136,7 +201,6 @@ import { Capacitor } from '@capacitor/core'
 import { useRoute, useRouter } from 'vue-router'
 import { routeScreenNames } from './router'
 import AudioPrepareView from './views/AudioPrepareView.vue'
-import HomeView from './views/HomeView.vue'
 import ImageConfirmView from './views/ImageConfirmView.vue'
 import ImageSourceView from './views/ImageSourceView.vue'
 import ProcessingView from './views/ProcessingView.vue'
@@ -177,12 +241,15 @@ const audioImprovementTip = ref('')
 const isGeneratingPhrase = ref(false)
 const isRecording = ref(false)
 const isRecorderBusy = ref(false)
+const recordingElapsedMs = ref(0)
 
 const activeFlow = ref('image')
 const openValidation = ref(false)
 const showSettings = ref(true)
+const showSyllables = ref(false)
 const isFullscreen = ref(false)
 const isLandscape = ref(false)
+const viewportSize = ref('medium')
 
 function setScreen(nextScreen) {
   const safeScreen = routeScreenNames.includes(nextScreen) ? nextScreen : 'home'
@@ -230,6 +297,8 @@ let mediaRecorder = null
 let mediaStream = null
 let recordingMimeType = ''
 let recordedChunks = []
+let recordingTimer = null
+let recordingStartedAt = 0
 
 const correctedText = ref('')
 const simplifiedText = ref('')
@@ -239,6 +308,9 @@ const spokenTranscription = ref('')
 const originalLines = ref([])
 const simplifiedLines = ref([])
 const spokenLines = ref([])
+const syllabifiedOriginalText = ref('')
+const syllabifiedSimplifiedText = ref('')
+const syllabifiedSpokenText = ref('')
 
 const hasSpokenText = computed(() => spokenLines.value.length > 0 || !!spokenText.value)
 const hasRecordedAudio = computed(() => !!selectedAudioFile.value)
@@ -254,9 +326,23 @@ const audioFeedbackText = computed(() => {
     .join(' ')
 })
 
+const recordingElapsedLabel = computed(() => formatElapsedTime(recordingElapsedMs.value))
+
 const currentLines = computed(() => {
-  if (currentTextMode.value === 'spoken') return spokenLines.value
-  return currentTextMode.value === 'original' ? originalLines.value : simplifiedLines.value
+  if (!showSyllables.value) {
+    if (currentTextMode.value === 'spoken') return spokenLines.value
+    return currentTextMode.value === 'original' ? originalLines.value : simplifiedLines.value
+  }
+
+  if (currentTextMode.value === 'spoken') {
+    return splitDisplayLines(syllabifiedSpokenText.value || syllabifyText(spokenText.value || spokenTranscription.value))
+  }
+
+  if (currentTextMode.value === 'original') {
+    return splitDisplayLines(syllabifiedOriginalText.value || syllabifyText(correctedText.value))
+  }
+
+  return splitDisplayLines(syllabifiedSimplifiedText.value || syllabifyText(simplifiedText.value))
 })
 
 const currentWords = computed(() => {
@@ -302,6 +388,12 @@ const computedWordContextFontSize = computed(() => {
   return Math.max(isLandscape.value ? 11 : 12, base - Math.ceil(longLineFontReduction.value / 2))
 })
 const activeWordStyle = computed(() => isLandscape.value ? { fontSize: '1em' } : { fontSize: '1.04em' })
+const viewportClasses = computed(() => ({
+  fullscreen: isFullscreen.value,
+  'layout-landscape': isLandscape.value,
+  'layout-portrait': !isLandscape.value,
+  [`layout-${viewportSize.value}`]: true,
+}))
 
 watch(currentLineIndex, () => { currentWordIndex.value = 0 })
 watch(readingMode, () => {
@@ -320,7 +412,32 @@ watch(currentTextMode, () => {
 })
 
 function updateLayoutFlags() {
-  isLandscape.value = window.innerWidth > window.innerHeight && window.innerWidth <= 950
+  const width = window.innerWidth || 0
+  const height = window.innerHeight || 0
+  const landscape = width > height
+  const longSide = Math.max(width, height)
+  const shortSide = Math.min(width, height)
+
+  isLandscape.value = landscape
+
+  if (landscape) {
+    if (shortSide < 331 || longSide < 620) {
+      viewportSize.value = 'small'
+    } else if (longSide < 980 || shortSide < 520) {
+      viewportSize.value = 'medium'
+    } else {
+      viewportSize.value = 'large'
+    }
+    return
+  }
+
+  if (width < 430) {
+    viewportSize.value = 'small'
+  } else if (width < 820) {
+    viewportSize.value = 'medium'
+  } else {
+    viewportSize.value = 'large'
+  }
 }
 
 function isNativeAndroid() {
@@ -497,6 +614,9 @@ async function startAudioFlow() {
   spokenText.value = ''
   spokenTranscription.value = ''
   expectedReadingText.value = ''
+  syllabifiedOriginalText.value = ''
+  syllabifiedSimplifiedText.value = ''
+  syllabifiedSpokenText.value = ''
   setScreen('confirm-audio')
 
   try {
@@ -530,6 +650,7 @@ async function startRecording() {
       await inference.startWavRecording()
 
       isRecording.value = true
+      startRecordingTimer()
       selectedAudioName.value = 'gravacao-aluno.wav'
       recordingMimeType = 'audio/wav'
 
@@ -538,6 +659,7 @@ async function startRecording() {
       console.error('[DyslexAI] Erro ao iniciar gravação WAV nativa:', error)
       alert(error?.message || 'Não foi possível iniciar a gravação de áudio.')
       isRecording.value = false
+      stopRecordingTimer()
       return
     } finally {
       isRecorderBusy.value = false
@@ -573,6 +695,7 @@ async function startRecording() {
 
     mediaRecorder.onstart = () => {
       isRecording.value = true
+      startRecordingTimer()
       selectedAudioName.value = 'gravacao-aluno.webm'
     }
 
@@ -581,6 +704,7 @@ async function startRecording() {
       alert('Não foi possível gravar o áudio.')
       stopMediaTracks()
       isRecording.value = false
+      stopRecordingTimer()
     }
 
     mediaRecorder.onstop = () => {
@@ -598,6 +722,7 @@ async function startRecording() {
 
       stopMediaTracks()
       isRecording.value = false
+      stopRecordingTimer()
     }
 
     mediaRecorder.start()
@@ -606,6 +731,7 @@ async function startRecording() {
     alert('Não foi possível aceder ao microfone.')
     stopMediaTracks()
     isRecording.value = false
+    stopRecordingTimer()
   } finally {
     isRecorderBusy.value = false
   }
@@ -635,12 +761,14 @@ async function stopRecording() {
       audioPreviewUrl.value = URL.createObjectURL(audioBlob)
 
       isRecording.value = false
+      stopRecordingTimer()
       recordingMimeType = 'audio/wav'
       return
     } catch (error) {
       console.error('[DyslexAI] Erro ao parar gravação WAV nativa:', error)
       alert('Não foi possível terminar a gravação de áudio.')
       isRecording.value = false
+      stopRecordingTimer()
       return
     } finally {
       isRecorderBusy.value = false
@@ -687,15 +815,53 @@ function clearRecordedAudio() {
   selectedAudioName.value = ''
   isRecording.value = false
   isRecorderBusy.value = false
+  resetRecordingTimer()
   recordedChunks = []
   audioIssues.value = []
   clearAudioFeedback()
+}
+
+function startRecordingTimer() {
+  stopRecordingTimer(false)
+  recordingStartedAt = Date.now()
+  recordingElapsedMs.value = 0
+  recordingTimer = window.setInterval(() => {
+    recordingElapsedMs.value = Date.now() - recordingStartedAt
+  }, 250)
+}
+
+function stopRecordingTimer(reset = false) {
+  if (recordingTimer) {
+    window.clearInterval(recordingTimer)
+    recordingTimer = null
+  }
+  if (recordingStartedAt && !reset) {
+    recordingElapsedMs.value = Date.now() - recordingStartedAt
+  }
+  if (reset) {
+    recordingElapsedMs.value = 0
+  }
+  recordingStartedAt = 0
+}
+
+function resetRecordingTimer() {
+  stopRecordingTimer(true)
+}
+
+function formatElapsedTime(milliseconds) {
+  const totalSeconds = Math.max(0, Math.floor(Number(milliseconds || 0) / 1000))
+  const minutes = Math.floor(totalSeconds / 60)
+  const seconds = totalSeconds % 60
+  return `${minutes}:${String(seconds).padStart(2, '0')}`
 }
 
 async function generateReadingPhrase() {
   try {
     isGeneratingPhrase.value = true
     expectedReadingText.value = ''
+    syllabifiedOriginalText.value = ''
+    syllabifiedSimplifiedText.value = ''
+    syllabifiedSpokenText.value = ''
     clearRecordedAudio()
     audioIssues.value = []
     clearAudioFeedback()
@@ -717,6 +883,8 @@ async function generateReadingPhrase() {
     console.log('[DyslexAI] Resultado da geração de frase:', result)
 
     expectedReadingText.value = (result?.text || '').trim()
+    syllabifiedOriginalText.value = syllabifyText(expectedReadingText.value)
+    syllabifiedSimplifiedText.value = syllabifiedOriginalText.value
 
     if (!expectedReadingText.value) {
       throw new Error('Não foi possível gerar a frase.')
@@ -783,6 +951,9 @@ async function processRealImage() {
   simplifiedText.value = data.simplified_text || ''
   originalLines.value = Array.isArray(data.original_lines) ? data.original_lines : []
   simplifiedLines.value = Array.isArray(data.simplified_lines) ? data.simplified_lines : []
+  syllabifiedOriginalText.value = syllabifyText(correctedText.value)
+  syllabifiedSimplifiedText.value = syllabifyText(simplifiedText.value)
+  syllabifiedSpokenText.value = ''
 }
 
 async function processRealAudio(file) {
@@ -798,11 +969,14 @@ async function processRealAudio(file) {
   audioComparisonSummary.value = normalized.comparison_summary
   audioPositiveFeedback.value = normalized.positive_feedback
   audioImprovementTip.value = normalized.improvement_tip
+  syllabifiedOriginalText.value = normalized.syllabified_expected_text || syllabifyText(expectedReadingText.value)
+  syllabifiedSpokenText.value = normalized.syllabified_spoken_text || syllabifyText(spokenText.value)
 
   correctedText.value = expectedReadingText.value || spokenText.value
   originalLines.value = correctedText.value ? [correctedText.value] : []
   simplifiedText.value = spokenText.value
   simplifiedLines.value = [...spokenLines.value]
+  syllabifiedSimplifiedText.value = syllabifiedSpokenText.value
 }
 
 function normalizeAudioResult(data = {}) {
@@ -828,9 +1002,11 @@ function normalizeAudioResult(data = {}) {
       spokenTextValue || cleanText || transcription
     ),
     issues: normalizeAudioIssues(result.issues),
-    comparison_summary: cleanAudioText(result.comparison_summary || ''),
+    comparison_summary: cleanAudioText(result.comparison_summary || result.feedback_comment || ''),
     positive_feedback: cleanAudioText(result.positive_feedback || ''),
     improvement_tip: cleanAudioText(result.improvement_tip || ''),
+    syllabified_expected_text: cleanAudioText(result.syllabified_expected_text || ''),
+    syllabified_spoken_text: cleanAudioText(result.syllabified_spoken_text || ''),
   }
 }
 
@@ -909,6 +1085,68 @@ function normalizeAudioIssues(issues) {
       message: text,
     },
   ]
+}
+
+function splitDisplayLines(text) {
+  const cleaned = cleanAudioText(text)
+  return cleaned ? cleaned.split(/\r?\n+/).map(line => line.trim()).filter(Boolean) : []
+}
+
+function syllabifyText(text) {
+  return String(text || '')
+    .split(/(\s+)/)
+    .map(part => /\s+/.test(part) ? part : syllabifyWord(part))
+    .join('')
+    .replace(/\s+([,.!?;:])/g, '$1')
+    .trim()
+}
+
+function syllabifyWord(value) {
+  const match = String(value || '').match(/^([^\p{L}\p{N}]*)([\p{L}\p{N}À-ÿ]+)([^\p{L}\p{N}]*)$/u)
+  if (!match) return value
+
+  const [, prefix, word, suffix] = match
+  if (word.length <= 3) return value
+
+  const vowels = 'aeiouáéíóúâêôãõàüAEIOUÁÉÍÓÚÂÊÔÃÕÀÜ'
+  const chars = Array.from(word)
+  const chunks = []
+  let current = ''
+
+  for (let index = 0; index < chars.length; index += 1) {
+    const char = chars[index]
+    const next = chars[index + 1] || ''
+    const nextAfter = chars[index + 2] || ''
+    const previous = chars[index - 1] || ''
+
+    current += char
+
+    const isVowel = vowels.includes(char)
+    const nextIsVowel = vowels.includes(next)
+    const nextAfterIsVowel = vowels.includes(nextAfter)
+    const isLast = index === chars.length - 1
+    const keepDiphthong = isVowel && nextIsVowel && /[iuoãeõáéíóúâêôãõ]/i.test(next)
+
+    if (isLast) {
+      chunks.push(current)
+      break
+    }
+
+    if (isVowel && !keepDiphthong && next && !nextIsVowel && nextAfterIsVowel) {
+      chunks.push(current)
+      current = ''
+      continue
+    }
+
+    if (!isVowel && vowels.includes(previous) && nextIsVowel && current.length > 1) {
+      const consonant = current.slice(-1)
+      chunks.push(current.slice(0, -1))
+      current = consonant
+    }
+  }
+
+  const result = chunks.filter(Boolean).join('-')
+  return result.includes('-') ? `${prefix}${result}${suffix}` : value
 }
 
 async function processImage() {
@@ -1001,6 +1239,13 @@ function goHome() {
 
 function switchTextMode(mode) {
   currentTextMode.value = resolveAvailableTextMode(mode)
+  currentLineIndex.value = 0
+  currentWordIndex.value = 0
+  stopAllAudio()
+}
+
+function toggleSyllables() {
+  showSyllables.value = !showSyllables.value
   currentLineIndex.value = 0
   currentWordIndex.value = 0
   stopAllAudio()
@@ -1242,6 +1487,7 @@ function resetAll() {
   clearRecordedAudio()
   isRecording.value = false
   isRecorderBusy.value = false
+  resetRecordingTimer()
   correctedText.value = ''
   simplifiedText.value = ''
   spokenText.value = ''
@@ -1250,6 +1496,9 @@ function resetAll() {
   originalLines.value = []
   simplifiedLines.value = []
   spokenLines.value = []
+  syllabifiedOriginalText.value = ''
+  syllabifiedSimplifiedText.value = ''
+  syllabifiedSpokenText.value = ''
   openValidation.value = false
   showSettings.value = true
   currentTextMode.value = 'simplified'
@@ -1278,6 +1527,7 @@ onMounted(() => {
 onBeforeUnmount(() => {
   stopAllAudio()
   stopRecording()
+  stopRecordingTimer()
   stopMediaTracks()
   window.removeEventListener('resize', updateLayoutFlags)
   document.removeEventListener('fullscreenchange', onFullscreenChange)
@@ -7592,6 +7842,74 @@ body,
   font-weight: 760 !important;
 }
 
+/* ===== READER BUTTONS BALANCE =====
+   Os controlos do leitor devem parecer botoes normais, nao chips circulares.
+   Para 8 acoes, a grelha fica equilibrada em 4 + 4. */
+.reader-home.settings-open:not(.speech-result-home) .controls-compact {
+  display: grid !important;
+  grid-template-columns: repeat(4, minmax(0, 1fr)) !important;
+  gap: 8px !important;
+  width: 100% !important;
+  align-items: stretch !important;
+}
+
+.reader-home.settings-open:not(.speech-result-home) .controls-compact .pill-btn {
+  width: 100% !important;
+  min-width: 0 !important;
+  height: auto !important;
+  min-height: 42px !important;
+  aspect-ratio: auto !important;
+  padding: 8px 10px !important;
+  border-radius: 12px !important;
+  border: 1px solid #e5eaf2 !important;
+  background: #f3f6fb !important;
+  color: #344054 !important;
+  box-shadow: none !important;
+  font-size: clamp(.78rem, 1.9vw, .96rem) !important;
+  font-weight: 720 !important;
+  line-height: 1.12 !important;
+  text-align: center !important;
+  white-space: normal !important;
+  overflow-wrap: normal !important;
+  word-break: normal !important;
+  display: grid !important;
+  place-items: center !important;
+}
+
+.reader-home.settings-open:not(.speech-result-home) .controls-compact .pill-btn.active {
+  background: #e8f0fe !important;
+  color: #1a73e8 !important;
+  border-color: #bcd4ff !important;
+}
+
+@media (orientation: portrait) and (max-width: 620px) {
+  .reader-home.settings-open:not(.speech-result-home) .controls-compact {
+    grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+    gap: 6px !important;
+  }
+
+  .reader-home.settings-open:not(.speech-result-home) .controls-compact .pill-btn {
+    min-height: 38px !important;
+    border-radius: 11px !important;
+    padding: 7px 8px !important;
+    font-size: .78rem !important;
+  }
+}
+
+@media (orientation: landscape) and (max-height: 620px) {
+  .reader-home.settings-open:not(.speech-result-home) .controls-compact {
+    grid-template-columns: repeat(4, minmax(0, 1fr)) !important;
+    gap: 6px !important;
+  }
+
+  .reader-home.settings-open:not(.speech-result-home) .controls-compact .pill-btn {
+    min-height: 34px !important;
+    border-radius: 10px !important;
+    padding: 5px 7px !important;
+    font-size: clamp(.7rem, 1.35vw, .82rem) !important;
+  }
+}
+
 /* ===== RESPONSIVE SAFETY PASS — Android landscape/small screens =====
    Mantem a UI dentro do viewport e evita que controlos fixos roubem espaco
    aos ecras finais. */
@@ -7750,4 +8068,4874 @@ body,
     grid-template-columns: repeat(auto-fit, minmax(100px, 1fr)) !important;
   }
 }
+
+/* ===== FINAL READER BUTTON OVERRIDE =====
+   Tem de ficar no fim para vencer as regras antigas com !important. */
+.reader-home.settings-open:not(.speech-result-home) .controls-compact {
+  display: grid !important;
+  grid-template-columns: repeat(4, minmax(0, 1fr)) !important;
+  gap: 8px !important;
+  width: 100% !important;
+  align-items: stretch !important;
+}
+
+.reader-home.settings-open:not(.speech-result-home) .controls-compact .pill-btn {
+  width: 100% !important;
+  min-width: 0 !important;
+  height: auto !important;
+  min-height: 42px !important;
+  aspect-ratio: auto !important;
+  padding: 8px 10px !important;
+  border-radius: 12px !important;
+  border: 1px solid #e5eaf2 !important;
+  background: #f3f6fb !important;
+  color: #344054 !important;
+  box-shadow: none !important;
+  font-size: clamp(.78rem, 1.9vw, .96rem) !important;
+  font-weight: 720 !important;
+  line-height: 1.12 !important;
+  text-align: center !important;
+  white-space: normal !important;
+  overflow-wrap: normal !important;
+  word-break: normal !important;
+  display: grid !important;
+  place-items: center !important;
+}
+
+.reader-home.settings-open:not(.speech-result-home) .controls-compact .pill-btn.active {
+  background: #e8f0fe !important;
+  color: #1a73e8 !important;
+  border-color: #bcd4ff !important;
+}
+
+@media (orientation: portrait) and (max-width: 620px) {
+  .reader-home.settings-open:not(.speech-result-home) .controls-compact {
+    grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+    gap: 6px !important;
+  }
+
+  .reader-home.settings-open:not(.speech-result-home) .controls-compact .pill-btn {
+    min-height: 38px !important;
+    border-radius: 11px !important;
+    padding: 7px 8px !important;
+    font-size: .78rem !important;
+  }
+}
+
+@media (orientation: landscape) and (max-height: 620px) {
+  .reader-home.settings-open:not(.speech-result-home) .controls-compact {
+    grid-template-columns: repeat(4, minmax(0, 1fr)) !important;
+    gap: 6px !important;
+  }
+
+  .reader-home.settings-open:not(.speech-result-home) .controls-compact .pill-btn {
+    min-height: 34px !important;
+    border-radius: 10px !important;
+    padding: 5px 7px !important;
+    font-size: clamp(.7rem, 1.35vw, .82rem) !important;
+  }
+}
+
+/* ===== HOME RESPONSIVE FIT =====
+   Esta camada fica no fim de propósito: o Home tinha mínimos rígidos
+   em landscape que rebentavam em telemóveis pequenos. */
+.home-screen,
+.home-screen .google-home,
+.home-screen .google-home-main,
+.home-screen .home-intro-panel,
+.home-screen .home-actions-panel,
+.home-screen .home-option-card,
+.home-screen .home-option-text {
+  min-width: 0 !important;
+}
+
+.home-screen .google-home {
+  inline-size: 100vw !important;
+  max-inline-size: 100vw !important;
+}
+
+.home-screen .google-home-main {
+  inline-size: 100% !important;
+  max-inline-size: 100% !important;
+}
+
+.home-screen .home-option-card {
+  max-inline-size: 100% !important;
+  overflow: hidden !important;
+}
+
+.home-screen .home-option-text strong,
+.home-screen .home-option-text span,
+.home-screen .home-intro-panel h1,
+.home-screen .home-intro-panel p {
+  overflow-wrap: break-word !important;
+}
+
+.home-screen .assisted-intro-panel,
+.home-screen .speech-intro-panel,
+.home-screen .review-intro-panel,
+.home-screen .processing-panel,
+.home-screen .assisted-actions-panel,
+.home-screen .speech-work-panel,
+.home-screen .review-panel,
+.home-screen .assisted-option-card,
+.home-screen .speech-config-card,
+.home-screen .speech-phrase-card,
+.home-screen .speech-record-card,
+.home-screen .speech-record-controls,
+.home-screen .review-preview-card,
+.home-screen .image-confirm-controls {
+  min-width: 0 !important;
+  max-width: 100% !important;
+}
+
+@media (orientation: portrait) {
+  .home-screen .google-home-header {
+    padding: max(14px, env(safe-area-inset-top)) clamp(18px, 5vw, 24px) 6px !important;
+  }
+
+  .home-screen .google-home-main {
+    display: grid !important;
+    grid-template-columns: minmax(0, 1fr) !important;
+    grid-template-rows: auto minmax(0, 1fr) !important;
+    align-content: stretch !important;
+    gap: clamp(12px, 2.2vh, 18px) !important;
+    padding: 8px clamp(18px, 5vw, 24px) 8px !important;
+    overflow: hidden !important;
+  }
+
+  .home-screen .home-intro-panel {
+    position: static !important;
+    max-width: none !important;
+    justify-self: stretch !important;
+    justify-items: start !important;
+    gap: 8px !important;
+    text-align: left !important;
+  }
+
+  .home-screen .home-badge {
+    position: static !important;
+    inset: auto !important;
+    justify-self: start !important;
+    max-width: 100% !important;
+    transform: none !important;
+  }
+
+  .home-screen .home-intro-panel h1 {
+    max-width: 16ch !important;
+    font-size: clamp(1.35rem, 5.4vw, 2rem) !important;
+    line-height: 1.1 !important;
+    letter-spacing: 0 !important;
+  }
+
+  .home-screen .home-intro-panel p {
+    max-width: 40ch !important;
+    font-size: clamp(.78rem, 3vw, .98rem) !important;
+    line-height: 1.28 !important;
+  }
+
+  .home-screen .home-actions-panel {
+    width: calc(100vw - clamp(36px, 10vw, 48px)) !important;
+    max-width: calc(100vw - clamp(36px, 10vw, 48px)) !important;
+    height: 100% !important;
+    min-height: 0 !important;
+    display: grid !important;
+    grid-template-columns: minmax(0, 1fr) !important;
+    grid-template-rows: repeat(2, minmax(0, 1fr)) !important;
+    align-content: stretch !important;
+    gap: clamp(12px, 2.1vh, 18px) !important;
+    overflow: hidden !important;
+  }
+
+  .home-screen .home-option-card {
+    width: 100% !important;
+    max-width: 100% !important;
+    height: 100% !important;
+    min-height: 0 !important;
+    grid-template-columns: clamp(54px, 16vw, 72px) minmax(0, 1fr) !important;
+    gap: clamp(10px, 3vw, 14px) !important;
+    padding: clamp(12px, 2.2vh, 16px) !important;
+    border-radius: 18px !important;
+  }
+
+  .home-screen .home-option-icon {
+    width: clamp(54px, 16vw, 72px) !important;
+    height: clamp(54px, 16vw, 72px) !important;
+    min-width: clamp(54px, 16vw, 72px) !important;
+  }
+
+  .home-screen .home-option-text strong {
+    font-size: clamp(.98rem, 4vw, 1.24rem) !important;
+    line-height: 1.12 !important;
+    letter-spacing: 0 !important;
+    white-space: normal !important;
+  }
+
+  .home-screen .home-option-text span {
+    font-size: clamp(.72rem, 2.7vw, .88rem) !important;
+    line-height: 1.24 !important;
+    white-space: normal !important;
+  }
+
+  .home-screen .home-option-arrow {
+    display: none !important;
+  }
+}
+
+@media (orientation: landscape) {
+  .home-screen .home-intro-panel,
+  .home-screen .home-intro-panel h1,
+  .home-screen .home-intro-panel p,
+  .home-screen .home-actions-panel,
+  .home-screen .assisted-intro-panel,
+  .home-screen .assisted-intro-panel h1,
+  .home-screen .assisted-intro-panel p,
+  .home-screen .assisted-actions-panel,
+  .home-screen .speech-intro-panel,
+  .home-screen .speech-intro-panel h1,
+  .home-screen .speech-intro-panel p,
+  .home-screen .speech-work-panel,
+  .home-screen .review-intro-panel,
+  .home-screen .review-intro-panel h1,
+  .home-screen .review-intro-panel p,
+  .home-screen .review-panel {
+    transform: none !important;
+  }
+
+  .home-screen .google-home {
+    height: 100dvh !important;
+    min-height: 100dvh !important;
+    margin: 0 !important;
+    border-radius: 0 !important;
+  }
+
+  .home-screen .google-home-header {
+    padding: max(6px, env(safe-area-inset-top)) clamp(10px, 2.6vw, 28px) 0 !important;
+  }
+
+  .home-screen .home-logo-mark {
+    width: clamp(24px, 5.4vh, 32px) !important;
+    height: clamp(24px, 5.4vh, 32px) !important;
+    min-width: clamp(24px, 5.4vh, 32px) !important;
+  }
+
+  .home-screen .home-brand-title {
+    font-size: clamp(1.05rem, 4.6vh, 1.5rem) !important;
+    line-height: 1 !important;
+    letter-spacing: 0 !important;
+  }
+
+  .home-screen .home-brand-subtitle {
+    font-size: clamp(.62rem, 2.5vh, .78rem) !important;
+    margin-top: 1px !important;
+  }
+
+  .home-screen .home-help-btn {
+    width: clamp(28px, 7.2vh, 34px) !important;
+    height: clamp(28px, 7.2vh, 34px) !important;
+    min-width: clamp(28px, 7.2vh, 34px) !important;
+  }
+
+  .home-screen .google-home-main {
+    display: grid !important;
+    grid-template-columns: minmax(0, .68fr) minmax(0, 1.32fr) !important;
+    grid-template-rows: minmax(0, 1fr) !important;
+    align-items: center !important;
+    gap: clamp(8px, 2.6vw, 24px) !important;
+    padding: clamp(2px, 1.2vh, 6px) clamp(10px, 2.8vw, 28px) clamp(4px, 1.4vh, 8px) !important;
+    overflow: hidden !important;
+  }
+
+  .home-screen .home-intro-panel {
+    align-self: center !important;
+    justify-self: start !important;
+    max-width: none !important;
+    gap: clamp(3px, 1.4vh, 7px) !important;
+    padding: 0 !important;
+    width: 100% !important;
+  }
+
+  .home-screen .assisted-intro-panel,
+  .home-screen .speech-intro-panel,
+  .home-screen .review-intro-panel {
+    align-self: center !important;
+    justify-self: start !important;
+    max-width: none !important;
+    width: 100% !important;
+    padding: 0 !important;
+    gap: clamp(3px, 1.4vh, 7px) !important;
+  }
+
+  .home-screen .home-badge {
+    min-height: 0 !important;
+    padding: 3px 8px !important;
+    font-size: clamp(.62rem, 2.55vh, .78rem) !important;
+    line-height: 1.1 !important;
+  }
+
+  .home-screen .home-intro-panel h1 {
+    max-width: 15ch !important;
+    font-size: clamp(1rem, 6.5vh, 1.72rem) !important;
+    line-height: 1.06 !important;
+    letter-spacing: 0 !important;
+  }
+
+  .home-screen .assisted-intro-panel h1,
+  .home-screen .speech-intro-panel h1,
+  .home-screen .review-intro-panel h1 {
+    max-width: 15ch !important;
+    font-size: clamp(1rem, 6.5vh, 1.72rem) !important;
+    line-height: 1.06 !important;
+    letter-spacing: 0 !important;
+  }
+
+  .home-screen .home-intro-panel p {
+    max-width: 32ch !important;
+    font-size: clamp(.56rem, 2.55vh, .76rem) !important;
+    line-height: 1.22 !important;
+  }
+
+  .home-screen .assisted-intro-panel p,
+  .home-screen .speech-intro-panel p,
+  .home-screen .review-intro-panel p {
+    max-width: 32ch !important;
+    font-size: clamp(.56rem, 2.55vh, .76rem) !important;
+    line-height: 1.22 !important;
+  }
+
+  .home-screen .home-actions-panel {
+    align-self: center !important;
+    justify-self: stretch !important;
+    max-width: none !important;
+    height: auto !important;
+    gap: clamp(6px, 2.2vh, 12px) !important;
+    grid-template-rows: repeat(2, minmax(0, auto)) !important;
+  }
+
+  .home-screen .assisted-actions-panel {
+    align-self: center !important;
+    justify-self: stretch !important;
+    max-width: none !important;
+    height: auto !important;
+    gap: clamp(6px, 2.2vh, 12px) !important;
+    grid-template-rows: repeat(2, minmax(0, auto)) !important;
+  }
+
+  .home-screen .home-option-card {
+    height: auto !important;
+    min-height: clamp(58px, 28vh, 84px) !important;
+    grid-template-columns: clamp(42px, 15vh, 62px) minmax(0, 1fr) clamp(24px, 7vh, 32px) !important;
+    gap: clamp(7px, 1.8vw, 12px) !important;
+    padding: clamp(6px, 1.7vh, 10px) !important;
+    border-radius: clamp(13px, 4vh, 18px) !important;
+  }
+
+  .home-screen .assisted-option-card {
+    height: auto !important;
+    min-height: clamp(58px, 28vh, 84px) !important;
+    grid-template-columns: clamp(42px, 15vh, 62px) minmax(0, 1fr) clamp(24px, 7vh, 32px) !important;
+    gap: clamp(7px, 1.8vw, 12px) !important;
+    padding: clamp(6px, 1.7vh, 10px) !important;
+    border-radius: clamp(13px, 4vh, 18px) !important;
+    overflow: hidden !important;
+  }
+
+  .home-screen .home-option-icon {
+    width: clamp(42px, 15vh, 62px) !important;
+    height: clamp(42px, 15vh, 62px) !important;
+    min-width: clamp(42px, 15vh, 62px) !important;
+    border-radius: clamp(11px, 3.8vh, 16px) !important;
+  }
+
+  .home-screen .assisted-option-icon {
+    width: clamp(42px, 15vh, 62px) !important;
+    height: clamp(42px, 15vh, 62px) !important;
+    min-width: clamp(42px, 15vh, 62px) !important;
+    border-radius: clamp(11px, 3.8vh, 16px) !important;
+  }
+
+  .home-screen .home-option-text {
+    gap: 3px !important;
+  }
+
+  .home-screen .home-option-text strong {
+    font-size: clamp(.78rem, 3.9vh, 1.08rem) !important;
+    line-height: 1.08 !important;
+    letter-spacing: 0 !important;
+  }
+
+  .home-screen .home-option-text span {
+    font-size: clamp(.58rem, 2.65vh, .76rem) !important;
+    line-height: 1.18 !important;
+  }
+
+  .home-screen .home-option-arrow {
+    display: grid !important;
+    width: clamp(24px, 7vh, 32px) !important;
+    height: clamp(24px, 7vh, 32px) !important;
+    min-width: clamp(24px, 7vh, 32px) !important;
+    font-size: clamp(.9rem, 4vh, 1.2rem) !important;
+  }
+
+  .home-screen .home-bottom-nav {
+    width: min(240px, calc(100vw - 24px)) !important;
+    margin-bottom: max(4px, env(safe-area-inset-bottom)) !important;
+    padding: 3px !important;
+  }
+
+  .home-screen .home-bottom-nav button {
+    min-height: clamp(32px, 11vh, 44px) !important;
+    padding: 3px 6px !important;
+  }
+
+  .home-screen .home-bottom-nav button svg {
+    width: clamp(16px, 5vh, 20px) !important;
+    height: clamp(16px, 5vh, 20px) !important;
+  }
+
+  .home-screen .home-bottom-nav button span {
+    font-size: clamp(.58rem, 2.4vh, .72rem) !important;
+  }
+
+  .home-screen .speech-work-panel {
+    grid-column: 2 !important;
+    grid-row: 1 !important;
+    align-self: center !important;
+    justify-self: stretch !important;
+    display: grid !important;
+    grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+    grid-template-rows: repeat(2, minmax(0, auto)) auto !important;
+    gap: clamp(5px, 1.6vh, 8px) !important;
+    max-width: none !important;
+    height: auto !important;
+    min-height: 0 !important;
+    overflow: hidden !important;
+  }
+
+  .home-screen .speech-intro-panel {
+    grid-column: 1 !important;
+    grid-row: 1 !important;
+  }
+
+  .home-screen .speech-config-card,
+  .home-screen .speech-phrase-card,
+  .home-screen .speech-record-card,
+  .home-screen .speech-record-controls {
+    min-height: 0 !important;
+    padding: clamp(6px, 1.8vh, 10px) !important;
+    border-radius: 14px !important;
+    overflow: hidden !important;
+  }
+
+  .home-screen .speech-config-grid {
+    gap: 5px !important;
+  }
+
+  .home-screen .speech-config-grid label,
+  .home-screen .speech-label,
+  .home-screen .status-pill,
+  .home-screen .status-file {
+    font-size: clamp(.52rem, 2.2vh, .68rem) !important;
+    line-height: 1.12 !important;
+  }
+
+  .home-screen .speech-config-grid select,
+  .home-screen .speech-button-row .soft-action,
+  .home-screen .speech-record-controls button {
+    min-height: clamp(26px, 8vh, 34px) !important;
+    padding: 4px 7px !important;
+    font-size: clamp(.58rem, 2.3vh, .72rem) !important;
+  }
+
+  .home-screen .speech-phrase-card strong {
+    font-size: clamp(.72rem, 3.2vh, .98rem) !important;
+    line-height: 1.14 !important;
+  }
+
+  .home-screen .speech-record-card {
+    grid-template-columns: clamp(42px, 15vh, 60px) minmax(0, 1fr) !important;
+  }
+
+  .home-screen .speech-record-icon {
+    width: clamp(42px, 15vh, 60px) !important;
+    height: clamp(42px, 15vh, 60px) !important;
+  }
+
+  .home-screen .speech-record-controls {
+    grid-column: 1 / -1 !important;
+    display: grid !important;
+    grid-template-columns: repeat(4, minmax(0, 1fr)) !important;
+    gap: 6px !important;
+  }
+
+  .home-screen .review-panel {
+    align-self: center !important;
+    justify-self: stretch !important;
+    display: grid !important;
+    grid-template-rows: minmax(0, 1fr) auto !important;
+    gap: clamp(6px, 1.8vh, 10px) !important;
+    max-width: none !important;
+    height: 100% !important;
+    min-height: 0 !important;
+    overflow: hidden !important;
+  }
+
+  .home-screen .review-preview-card {
+    min-height: 0 !important;
+    height: 100% !important;
+    padding: clamp(6px, 1.8vh, 10px) !important;
+    overflow: hidden !important;
+  }
+
+  .home-screen .preview-image {
+    max-height: 100% !important;
+    object-fit: contain !important;
+  }
+
+  .home-screen .image-confirm-controls {
+    display: grid !important;
+    grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+    gap: 6px !important;
+    min-height: 0 !important;
+  }
+}
+
+@media (orientation: landscape) and (max-width: 640px) {
+  .home-screen .google-home-main {
+    grid-template-columns: minmax(0, .62fr) minmax(0, 1.38fr) !important;
+    gap: 8px !important;
+    padding-left: 8px !important;
+    padding-right: 8px !important;
+  }
+
+  .home-screen .home-badge {
+    display: none !important;
+  }
+
+  .home-screen .home-intro-panel h1 {
+    font-size: clamp(1rem, 6.5vh, 1.55rem) !important;
+    max-width: 12ch !important;
+  }
+
+  .home-screen .home-intro-panel p {
+    font-size: clamp(.56rem, 2.45vh, .68rem) !important;
+    max-width: 27ch !important;
+  }
+
+  .home-screen .home-option-card {
+    grid-template-columns: clamp(38px, 14vh, 54px) minmax(0, 1fr) 26px !important;
+    min-height: clamp(52px, 27vh, 74px) !important;
+    gap: 7px !important;
+  }
+
+  .home-screen .home-option-icon {
+    width: clamp(38px, 14vh, 54px) !important;
+    height: clamp(38px, 14vh, 54px) !important;
+    min-width: clamp(38px, 14vh, 54px) !important;
+  }
+
+  .home-screen .home-option-text strong {
+    font-size: clamp(.72rem, 3.4vh, .95rem) !important;
+  }
+
+  .home-screen .home-option-text span {
+    font-size: clamp(.52rem, 2.35vh, .66rem) !important;
+  }
+
+  .home-screen .home-option-arrow {
+    width: 26px !important;
+    height: 26px !important;
+    min-width: 26px !important;
+  }
+
+  .home-screen .assisted-intro-panel h1,
+  .home-screen .speech-intro-panel h1,
+  .home-screen .review-intro-panel h1 {
+    max-width: 12ch !important;
+    font-size: clamp(1rem, 6.5vh, 1.55rem) !important;
+  }
+
+  .home-screen .assisted-intro-panel p,
+  .home-screen .speech-intro-panel p,
+  .home-screen .review-intro-panel p {
+    max-width: 27ch !important;
+    font-size: clamp(.56rem, 2.45vh, .68rem) !important;
+  }
+
+  .home-screen .assisted-option-card {
+    grid-template-columns: clamp(38px, 14vh, 54px) minmax(0, 1fr) 26px !important;
+    min-height: clamp(52px, 27vh, 74px) !important;
+    gap: 7px !important;
+  }
+
+  .home-screen .assisted-option-icon {
+    width: clamp(38px, 14vh, 54px) !important;
+    height: clamp(38px, 14vh, 54px) !important;
+    min-width: clamp(38px, 14vh, 54px) !important;
+  }
+
+  .home-screen .speech-work-panel {
+    gap: 5px !important;
+  }
+
+  .home-screen .speech-config-card,
+  .home-screen .speech-phrase-card,
+  .home-screen .speech-record-card,
+  .home-screen .speech-record-controls {
+    padding: 6px !important;
+  }
+}
+
+@media (orientation: landscape) {
+  .home-screen .speech-home:not(.review-home) .google-home-main {
+    display: grid !important;
+    grid-template-columns: minmax(0, .68fr) minmax(0, 1.32fr) !important;
+    grid-template-rows: minmax(0, 1fr) !important;
+    align-items: center !important;
+    gap: clamp(8px, 2.6vw, 24px) !important;
+    padding: clamp(2px, 1.2vh, 6px) clamp(10px, 2.8vw, 28px) clamp(4px, 1.4vh, 8px) !important;
+  }
+
+  .home-screen .speech-home:not(.review-home) .speech-intro-panel,
+  .home-screen .speech-home:not(.review-home) .speech-intro-panel h1,
+  .home-screen .speech-home:not(.review-home) .speech-intro-panel p,
+  .home-screen .speech-home:not(.review-home) .speech-work-panel {
+    transform: none !important;
+  }
+
+  .home-screen .speech-home:not(.review-home) .speech-intro-panel {
+    grid-column: 1 !important;
+    grid-row: 1 !important;
+    align-self: center !important;
+    justify-self: start !important;
+    width: 100% !important;
+    max-width: none !important;
+    padding: 0 !important;
+  }
+
+  .home-screen .speech-home:not(.review-home) .speech-intro-panel h1 {
+    max-width: 15ch !important;
+    font-size: clamp(1rem, 6.5vh, 1.72rem) !important;
+    line-height: 1.06 !important;
+    letter-spacing: 0 !important;
+  }
+
+  .home-screen .speech-home:not(.review-home) .speech-intro-panel p {
+    max-width: 32ch !important;
+    font-size: clamp(.56rem, 2.55vh, .76rem) !important;
+    line-height: 1.22 !important;
+  }
+
+  .home-screen .speech-home:not(.review-home) .speech-work-panel {
+    grid-column: 2 !important;
+    grid-row: 1 !important;
+    align-self: center !important;
+    justify-self: stretch !important;
+    height: auto !important;
+    min-height: 0 !important;
+    max-height: 100% !important;
+  }
+}
+
+@media (orientation: landscape) and (max-height: 430px) {
+  .home-screen .review-home .google-home-main,
+  .home-screen .processing-home .google-home-main {
+    display: grid !important;
+    grid-template-columns: minmax(0, 1fr) !important;
+    grid-template-rows: minmax(0, 1fr) !important;
+    align-items: center !important;
+    justify-items: stretch !important;
+    gap: 0 !important;
+    padding: clamp(4px, 1.5vh, 8px) clamp(12px, 3vw, 28px) clamp(4px, 1.5vh, 8px) !important;
+    overflow: hidden !important;
+  }
+
+  .home-screen .review-home .speech-intro-panel,
+  .home-screen .review-home .review-intro-panel {
+    display: none !important;
+  }
+
+  .home-screen .review-home .review-panel {
+    grid-column: 1 !important;
+    grid-row: 1 !important;
+    width: 100% !important;
+    height: 100% !important;
+    max-height: 100% !important;
+    display: grid !important;
+    grid-template-rows: minmax(0, 1fr) auto !important;
+    gap: 6px !important;
+    align-self: center !important;
+    justify-self: stretch !important;
+    transform: none !important;
+    overflow: hidden !important;
+  }
+
+  .home-screen .review-home .review-preview-card {
+    width: 100% !important;
+    height: 100% !important;
+    min-height: 0 !important;
+    padding: 8px !important;
+    display: grid !important;
+    place-items: center !important;
+    overflow: hidden !important;
+  }
+
+  .home-screen .review-home .preview-image {
+    width: 100% !important;
+    height: 100% !important;
+    max-height: 100% !important;
+    object-fit: contain !important;
+  }
+
+  .home-screen .review-home .image-confirm-controls {
+    width: 100% !important;
+    min-height: 34px !important;
+    display: grid !important;
+    grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+    gap: 6px !important;
+    transform: none !important;
+  }
+
+  .home-screen .review-home .image-confirm-controls button {
+    min-height: 32px !important;
+    padding: 6px 8px !important;
+    font-size: .68rem !important;
+  }
+
+  .home-screen .processing-home .processing-panel {
+    width: 100% !important;
+    max-height: 100% !important;
+    padding: 12px 14px !important;
+    transform: none !important;
+    overflow: hidden !important;
+  }
+
+  .home-screen .speech-home:not(.review-home) .google-home-main {
+    grid-template-columns: minmax(0, 1fr) !important;
+    grid-template-rows: minmax(0, 1fr) !important;
+    padding: clamp(4px, 1.5vh, 8px) clamp(12px, 3vw, 28px) clamp(4px, 1.5vh, 8px) !important;
+  }
+
+  .home-screen .speech-home:not(.review-home) .speech-intro-panel {
+    display: none !important;
+  }
+
+  .home-screen .speech-home:not(.review-home) .speech-work-panel {
+    grid-column: 1 !important;
+    grid-row: 1 !important;
+    transform: none !important;
+    width: 100% !important;
+    height: 100% !important;
+    max-height: 100% !important;
+    display: grid !important;
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) !important;
+    grid-template-rows: 52px 44px 44px !important;
+    align-content: start !important;
+    gap: clamp(5px, 1.8vh, 8px) !important;
+  }
+
+  .home-screen .speech-home:not(.review-home) .speech-phrase-card {
+    grid-column: 1 / -1 !important;
+    grid-row: 1 !important;
+    min-height: 52px !important;
+    display: grid !important;
+    align-content: center !important;
+    justify-items: center !important;
+    gap: 2px !important;
+    transform: none !important;
+    overflow: hidden !important;
+  }
+
+  .home-screen .speech-home:not(.review-home) .speech-config-card {
+    grid-row: 2 !important;
+    min-height: 0 !important;
+  }
+
+  .home-screen .speech-home:not(.review-home) .speech-config-card {
+    grid-column: 1 !important;
+    display: grid !important;
+    grid-template-columns: minmax(0, 1fr) !important;
+    align-items: center !important;
+    max-height: 44px !important;
+    overflow: hidden !important;
+    z-index: 2 !important;
+  }
+
+  .home-screen .speech-home:not(.review-home) .speech-record-card {
+    display: none !important;
+  }
+
+  .home-screen .speech-home:not(.review-home) .speech-record-controls {
+    grid-column: 1 / -1 !important;
+    grid-row: 3 !important;
+    position: static !important;
+    margin: 0 !important;
+    transform: none !important;
+    z-index: 1 !important;
+  }
+
+  .home-screen .speech-home:not(.review-home) .speech-config-grid {
+    display: none !important;
+  }
+
+  .home-screen .speech-home:not(.review-home) .speech-button-row {
+    display: grid !important;
+    grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+    gap: 6px !important;
+    width: 100% !important;
+    margin: 0 !important;
+  }
+
+  .home-screen .speech-home:not(.review-home) .speech-button-row .soft-action {
+    min-width: 0 !important;
+    width: 100% !important;
+  }
+
+  .home-screen .speech-home:not(.review-home) .speech-phrase-card .speech-label {
+    font-size: .58rem !important;
+    line-height: 1 !important;
+  }
+
+  .home-screen .speech-home:not(.review-home) .speech-phrase-card strong {
+    font-size: clamp(.74rem, 3vh, .92rem) !important;
+    line-height: 1.1 !important;
+    text-align: center !important;
+    max-width: 100% !important;
+  }
+}
+
+@media (orientation: landscape) and (max-height: 430px) {
+  .home-screen .reader-home.settings-open:not(.speech-result-home) .reader-main {
+    grid-template-rows: minmax(36px, 1fr) 158px !important;
+    gap: 3px !important;
+    padding: 4px clamp(12px, 2.6vw, 22px) 6px !important;
+    align-content: stretch !important;
+    overflow: hidden !important;
+  }
+
+  .home-screen .reader-home.settings-open:not(.speech-result-home) .reader-bottom {
+    height: 158px !important;
+    max-height: 158px !important;
+    gap: 5px !important;
+    padding: 0 clamp(12px, 2.6vw, 18px) max(4px, env(safe-area-inset-bottom)) !important;
+    overflow: visible !important;
+    align-self: end !important;
+  }
+
+  .home-screen .reader-home.settings-open:not(.speech-result-home) .reader-control-stack {
+    gap: 5px !important;
+    overflow: visible !important;
+  }
+
+  .home-screen .reader-home.settings-open:not(.speech-result-home) .progress-label,
+  .home-screen .reader-home.settings-open:not(.speech-result-home) .progress-line {
+    display: none !important;
+  }
+
+  .home-screen .reader-home.settings-open:not(.speech-result-home) .transport-row {
+    display: grid !important;
+    grid-template-columns: repeat(3, 30px) !important;
+    justify-content: center !important;
+    align-items: center !important;
+    gap: 8px !important;
+    min-height: 32px !important;
+    margin: 0 !important;
+  }
+
+  .home-screen .reader-home.settings-open:not(.speech-result-home) .transport-row .round-btn,
+  .home-screen .reader-home.settings-open:not(.speech-result-home) .transport-row .play-btn {
+    width: 30px !important;
+    min-width: 30px !important;
+    height: 30px !important;
+    min-height: 30px !important;
+    display: grid !important;
+    place-items: center !important;
+    padding: 0 !important;
+    font-size: 1rem !important;
+  }
+
+  .home-screen .reader-home.settings-open:not(.speech-result-home) .controls-compact {
+    display: grid !important;
+    grid-auto-flow: column !important;
+    grid-auto-columns: minmax(0, 1fr) !important;
+    grid-template-columns: none !important;
+    gap: 5px !important;
+    width: 100% !important;
+    min-width: 0 !important;
+    min-height: 30px !important;
+    overflow: hidden !important;
+  }
+
+  .home-screen .reader-home.settings-open:not(.speech-result-home) .controls-compact .pill-btn {
+    min-width: 0 !important;
+    width: 100% !important;
+    min-height: 28px !important;
+    padding: 4px 6px !important;
+    border-radius: 999px !important;
+    font-size: clamp(.56rem, 1.45vw, .68rem) !important;
+    line-height: 1.05 !important;
+    white-space: nowrap !important;
+  }
+
+  .home-screen .reader-home.settings-open:not(.speech-result-home) .settings-panel {
+    display: grid !important;
+    grid-template-columns: 1fr 1fr 1.05fr !important;
+    gap: 5px !important;
+    min-height: 66px !important;
+    padding: 5px !important;
+    border-radius: 12px !important;
+    overflow: hidden !important;
+  }
+
+  .home-screen .reader-home.settings-open:not(.speech-result-home) .setting-block {
+    min-width: 0 !important;
+    gap: 3px !important;
+  }
+
+  .home-screen .reader-home.settings-open:not(.speech-result-home) .setting-block label {
+    font-size: .58rem !important;
+    line-height: 1.05 !important;
+  }
+
+  .home-screen .reader-home.settings-open:not(.speech-result-home) .setting-block input {
+    height: 18px !important;
+  }
+
+  .home-screen .reader-home.settings-open:not(.speech-result-home) .setting-block select {
+    min-height: 28px !important;
+    padding: 4px 7px !important;
+    font-size: .58rem !important;
+  }
+}
+
+@media (orientation: portrait) {
+  .home-screen .google-home {
+    width: calc(100vw - 12px) !important;
+    max-width: calc(100vw - 12px) !important;
+    height: calc(100dvh - 12px) !important;
+    min-height: calc(100dvh - 12px) !important;
+    margin: 6px auto !important;
+    border: 1px solid #d9e2ee !important;
+    border-radius: 10px !important;
+    box-shadow: 0 6px 18px rgba(15, 23, 42, .06) !important;
+    overflow: hidden !important;
+  }
+
+  .home-screen .reader-home.settings-open:not(.speech-result-home) .reader-main {
+    grid-template-rows: minmax(150px, 1fr) auto !important;
+    gap: 6px !important;
+    overflow: hidden !important;
+  }
+
+  .home-screen .reader-home.settings-open:not(.speech-result-home) .reader-top {
+    min-height: 0 !important;
+    padding-bottom: 8px !important;
+  }
+
+  .home-screen .reader-home.settings-open:not(.speech-result-home) .reader-bottom {
+    width: calc(100vw - 44px) !important;
+    max-width: calc(100vw - 44px) !important;
+    justify-self: center !important;
+    margin-left: auto !important;
+    margin-right: auto !important;
+    max-height: none !important;
+    overflow: visible !important;
+    padding-top: 4px !important;
+  }
+
+  .home-screen .reader-home.settings-open:not(.speech-result-home) .transport-row {
+    min-height: 34px !important;
+    margin-top: 0 !important;
+    margin-bottom: 8px !important;
+    position: relative !important;
+    z-index: 3 !important;
+    transform: none !important;
+    display: flex !important;
+    justify-content: center !important;
+    align-items: center !important;
+    gap: 14px !important;
+  }
+
+  .home-screen .reader-home.settings-open:not(.speech-result-home) .transport-row .round-btn,
+  .home-screen .reader-home.settings-open:not(.speech-result-home) .transport-row .play-btn {
+    width: 34px !important;
+    min-width: 34px !important;
+    height: 34px !important;
+    min-height: 34px !important;
+    display: grid !important;
+    place-items: center !important;
+  }
+
+  .home-screen .reader-home.settings-open:not(.speech-result-home) .controls-compact {
+    width: 100% !important;
+    max-width: 100% !important;
+    min-width: 0 !important;
+    box-sizing: border-box !important;
+    grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+    gap: 7px !important;
+    margin-inline: auto !important;
+  }
+
+  .home-screen .reader-home.settings-open:not(.speech-result-home) .controls-compact .pill-btn {
+    min-width: 0 !important;
+    max-width: 100% !important;
+  }
+
+  .home-screen .reader-home.settings-open:not(.speech-result-home) .controls-compact .pill-btn:last-child {
+    grid-column: 1 / -1 !important;
+    width: 100% !important;
+  }
+
+  .home-screen .reader-home.settings-open:not(.speech-result-home) .controls-compact button:last-of-type {
+    grid-column: 1 / -1 !important;
+    width: 100% !important;
+  }
+
+  .home-screen .reader-home.settings-open:not(.speech-result-home) .settings-panel {
+    width: 100% !important;
+    max-width: 100% !important;
+    min-width: 0 !important;
+    box-sizing: border-box !important;
+    grid-template-columns: repeat(3, minmax(0, 1fr)) !important;
+    gap: 6px !important;
+    padding: 7px !important;
+    margin-inline: auto !important;
+  }
+
+  .home-screen .reader-home.settings-open:not(.speech-result-home) .setting-block {
+    min-width: 0 !important;
+  }
+
+  .home-screen .reader-home.settings-open:not(.speech-result-home) .reader-control-stack {
+    width: 100% !important;
+    max-width: 100% !important;
+    min-width: 0 !important;
+    overflow: hidden !important;
+  }
+
+  .home-screen .reader-home.settings-open:not(.speech-result-home) .setting-block select,
+  .home-screen .reader-home.settings-open:not(.speech-result-home) .setting-block input {
+    min-width: 0 !important;
+    width: 100% !important;
+  }
+}
+
+@media (orientation: landscape) and (max-height: 430px) {
+  .home-screen .reader-home.settings-open:not(.speech-result-home) .reader-bottom,
+  .home-screen .reader-home.settings-open:not(.speech-result-home) .controls-compact,
+  .home-screen .reader-home.settings-open:not(.speech-result-home) .settings-panel {
+    justify-self: center !important;
+    margin-left: auto !important;
+    margin-right: auto !important;
+    transform: none !important;
+  }
+
+  .home-screen .reader-home.settings-open:not(.speech-result-home) .reader-main {
+    grid-template-rows: minmax(30px, 1fr) 170px !important;
+    overflow: hidden !important;
+  }
+
+  .home-screen .reader-home.settings-open:not(.speech-result-home) .reader-bottom {
+    height: 170px !important;
+    max-height: 170px !important;
+    overflow: hidden !important;
+  }
+
+  .home-screen .reader-home.settings-open:not(.speech-result-home) .transport-row {
+    min-height: 30px !important;
+    position: relative !important;
+    z-index: 3 !important;
+  }
+
+  .home-screen .reader-home.settings-open:not(.speech-result-home) .controls-compact {
+    min-height: 30px !important;
+  }
+
+  .home-screen .reader-home.settings-open:not(.speech-result-home) .settings-panel {
+    display: grid !important;
+    min-height: 72px !important;
+    height: 72px !important;
+    max-height: 72px !important;
+    align-items: center !important;
+  }
+}
+
+@media (orientation: landscape) {
+  .home-screen .reader-home.settings-open:not(.speech-result-home) .reader-bottom {
+    width: calc(100vw - 52px) !important;
+    max-width: calc(100vw - 52px) !important;
+    justify-self: center !important;
+    margin-inline: auto !important;
+  }
+
+  .home-screen .reader-home.settings-open:not(.speech-result-home) .controls-compact {
+    display: grid !important;
+    grid-template-columns: repeat(10, minmax(0, 1fr)) !important;
+    grid-auto-flow: row !important;
+    gap: 4px !important;
+    width: 100% !important;
+    max-width: 100% !important;
+    min-width: 0 !important;
+    overflow: hidden !important;
+  }
+
+  .home-screen .reader-home.settings-open:not(.speech-result-home) .controls-compact .pill-btn {
+    min-width: 0 !important;
+    width: 100% !important;
+    min-height: 28px !important;
+    padding: 4px 3px !important;
+    border-radius: 999px !important;
+    font-size: clamp(.48rem, .82vw, .66rem) !important;
+    line-height: 1.05 !important;
+    white-space: nowrap !important;
+    overflow-wrap: anywhere !important;
+    overflow: hidden !important;
+    text-overflow: clip !important;
+  }
+
+  .home-screen .reader-home.settings-open:not(.speech-result-home) .settings-panel {
+    width: 100% !important;
+    max-width: 100% !important;
+    margin-inline: auto !important;
+  }
+}
+
+@media (orientation: portrait) {
+  .home-screen .google-home:not(.reader-home) {
+    width: calc(100vw - 20px) !important;
+    max-width: calc(100vw - 20px) !important;
+    height: calc(100dvh - 24px) !important;
+    min-height: calc(100dvh - 24px) !important;
+    margin: 10px auto 14px !important;
+    border-radius: 12px !important;
+  }
+
+  .home-screen .google-home:not(.reader-home) .google-home-main {
+    padding-left: 14px !important;
+    padding-right: 14px !important;
+    padding-bottom: 14px !important;
+  }
+
+  .home-screen .google-home:not(.reader-home) .home-actions-panel {
+    width: 100% !important;
+    max-width: 100% !important;
+    justify-self: stretch !important;
+  }
+
+  .home-screen .google-home:not(.reader-home) .home-option-card {
+    width: 100% !important;
+    max-width: 100% !important;
+  }
+
+  .home-screen .google-home:not(.reader-home):not(.review-home) .google-home-main {
+    grid-template-rows: auto minmax(0, 1fr) !important;
+    align-content: stretch !important;
+    gap: clamp(14px, 2.2vh, 18px) !important;
+    padding-bottom: clamp(18px, 3vh, 26px) !important;
+  }
+
+  .home-screen .google-home:not(.reader-home):not(.review-home) .home-actions-panel,
+  .home-screen .assisted-home .assisted-actions-panel {
+    height: 100% !important;
+    min-height: 0 !important;
+    align-content: stretch !important;
+    grid-template-rows: repeat(2, minmax(0, 1fr)) !important;
+    gap: clamp(14px, 2.4vh, 20px) !important;
+    padding-bottom: 0 !important;
+    transform: none !important;
+  }
+
+  .home-screen .google-home:not(.reader-home):not(.review-home) .home-option-card,
+  .home-screen .assisted-home .assisted-option-card {
+    height: 100% !important;
+    min-height: clamp(150px, 26vh, 190px) !important;
+    max-height: none !important;
+    align-self: stretch !important;
+  }
+
+  .home-screen .reader-home.settings-open:not(.speech-result-home) .controls-compact {
+    grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+  }
+
+  .home-screen .reader-home.settings-open:not(.speech-result-home) .controls-compact .pill-btn:last-child,
+  .home-screen .reader-home.settings-open:not(.speech-result-home) .controls-compact button:last-of-type {
+    grid-column: auto !important;
+    width: 100% !important;
+  }
+}
+
+/* ===== SPEECH LANDSCAPE FINAL FIX =====
+   Evita colisao entre frase, silabas e botoes em telemoveis deitados. */
+@media (orientation: landscape) and (max-height: 430px) {
+  .home-screen .speech-home:not(.review-home) {
+    grid-template-rows: auto minmax(0, 1fr) !important;
+  }
+
+  .home-screen .speech-home:not(.review-home) .google-home-header {
+    min-height: 0 !important;
+    padding: max(6px, env(safe-area-inset-top)) clamp(18px, 3vw, 28px) 2px !important;
+  }
+
+  .home-screen .speech-home:not(.review-home) .google-home-main {
+    display: grid !important;
+    grid-template-columns: minmax(0, 1fr) !important;
+    grid-template-rows: minmax(0, 1fr) !important;
+    padding: 4px clamp(18px, 4vw, 32px) max(8px, env(safe-area-inset-bottom)) !important;
+    overflow: hidden !important;
+  }
+
+  .home-screen .speech-home:not(.review-home) .speech-intro-panel {
+    display: none !important;
+  }
+
+  .home-screen .speech-home:not(.review-home) .speech-work-panel {
+    grid-column: 1 !important;
+    grid-row: 1 !important;
+    width: 100% !important;
+    height: 100% !important;
+    max-width: none !important;
+    max-height: 100% !important;
+    display: grid !important;
+    grid-template-columns: minmax(0, 1fr) minmax(112px, 128px) !important;
+    grid-template-rows: 44px minmax(58px, 1fr) 38px !important;
+    gap: 8px !important;
+    align-content: stretch !important;
+    transform: none !important;
+    overflow: hidden !important;
+  }
+
+  .home-screen .speech-home:not(.review-home) .speech-phrase-card {
+    grid-column: 1 / -1 !important;
+    grid-row: 2 !important;
+    min-height: 0 !important;
+    height: 100% !important;
+    display: grid !important;
+    grid-template-columns: minmax(0, 1fr) auto !important;
+    grid-template-rows: auto minmax(0, 1fr) !important;
+    align-items: center !important;
+    gap: 3px 10px !important;
+    padding: 8px 12px !important;
+    transform: none !important;
+    overflow: hidden !important;
+  }
+
+  .home-screen .speech-home:not(.review-home) .speech-phrase-card .speech-label {
+    grid-column: 1 / -1 !important;
+    font-size: .58rem !important;
+    line-height: 1 !important;
+    text-align: center !important;
+  }
+
+  .home-screen .speech-home:not(.review-home) .speech-phrase-card strong {
+    grid-column: 1 !important;
+    min-width: 0 !important;
+    max-width: 100% !important;
+    font-size: clamp(.68rem, 2.55vh, .86rem) !important;
+    line-height: 1.16 !important;
+    text-align: center !important;
+    overflow: hidden !important;
+    display: -webkit-box !important;
+    -webkit-line-clamp: 2 !important;
+    -webkit-box-orient: vertical !important;
+  }
+
+  .home-screen .speech-home:not(.review-home) .syllable-toggle {
+    grid-column: 2 !important;
+    grid-row: 2 !important;
+    justify-self: end !important;
+    align-self: center !important;
+    min-height: 28px !important;
+    padding: 4px 10px !important;
+    font-size: .68rem !important;
+    white-space: nowrap !important;
+  }
+
+  .home-screen .speech-home:not(.review-home) .speech-config-card {
+    grid-column: 1 !important;
+    grid-row: 1 !important;
+    min-height: 0 !important;
+    height: 44px !important;
+    display: grid !important;
+    grid-template-columns: minmax(0, 1fr) !important;
+    padding: 5px 8px !important;
+    background: #fff !important;
+    border: 1px solid #e5eaf2 !important;
+    border-radius: 14px !important;
+    box-shadow: 0 5px 14px rgba(15, 23, 42, .04) !important;
+    transform: none !important;
+    overflow: visible !important;
+  }
+
+  .home-screen .speech-home:not(.review-home) .speech-config-grid {
+    display: grid !important;
+    grid-template-columns: .7fr .55fr minmax(120px, 1fr) !important;
+    gap: 6px !important;
+    min-width: 0 !important;
+    align-items: end !important;
+  }
+
+  .home-screen .speech-home:not(.review-home) .speech-button-row {
+    display: none !important;
+  }
+
+  .home-screen .speech-home:not(.review-home) .speech-config-grid label {
+    gap: 2px !important;
+    min-width: 0 !important;
+    font-size: .54rem !important;
+    line-height: 1 !important;
+  }
+
+  .home-screen .speech-home:not(.review-home) .speech-config-grid label:last-child {
+    grid-column: auto !important;
+  }
+
+  .home-screen .speech-home:not(.review-home) .speech-config-grid select {
+    min-height: 26px !important;
+    padding: 3px 7px !important;
+    border-radius: 9px !important;
+    font-size: .62rem !important;
+  }
+
+  .home-screen .speech-home:not(.review-home) .speech-record-controls {
+    grid-column: 1 / -1 !important;
+    grid-row: 3 !important;
+    width: 100% !important;
+    height: 38px !important;
+    display: grid !important;
+    grid-template-columns: repeat(6, minmax(0, 1fr)) !important;
+    gap: 6px !important;
+    padding: 0 !important;
+    background: transparent !important;
+    border: 0 !important;
+    box-shadow: none !important;
+    transform: none !important;
+    overflow: visible !important;
+  }
+
+  .home-screen .speech-home:not(.review-home) .speech-record-controls button {
+    width: 100% !important;
+    min-width: 0 !important;
+    min-height: 38px !important;
+    padding: 6px 7px !important;
+    font-size: .68rem !important;
+  }
+
+  .home-screen .speech-home:not(.review-home) .speech-record-controls .speech-inline-generate {
+    display: grid !important;
+    place-items: center !important;
+  }
+
+  .home-screen .speech-home:not(.review-home) .speech-record-card {
+    grid-column: 2 !important;
+    grid-row: 1 !important;
+    min-height: 0 !important;
+    height: 44px !important;
+    display: grid !important;
+    grid-template-columns: 28px minmax(0, 1fr) !important;
+    gap: 6px !important;
+    align-items: center !important;
+    padding: 5px 7px !important;
+    background: #fff !important;
+    border: 1px solid #e5eaf2 !important;
+    border-radius: 14px !important;
+    box-shadow: 0 5px 14px rgba(15, 23, 42, .04) !important;
+    overflow: hidden !important;
+    transform: none !important;
+  }
+
+  .home-screen .speech-home:not(.review-home) .speech-record-icon {
+    width: 28px !important;
+    height: 28px !important;
+    border-radius: 9px !important;
+  }
+
+  .home-screen .speech-home:not(.review-home) .speech-record-copy {
+    min-width: 0 !important;
+    gap: 0 !important;
+  }
+
+  .home-screen .speech-home:not(.review-home) .recording-status-line {
+    display: grid !important;
+    grid-template-columns: minmax(0, 1fr) auto !important;
+    gap: 4px !important;
+    align-items: center !important;
+    min-width: 0 !important;
+  }
+
+  .home-screen .speech-home:not(.review-home) .status-pill {
+    min-width: 0 !important;
+    padding: 5px 6px !important;
+    font-size: .58rem !important;
+    line-height: 1 !important;
+    overflow: hidden !important;
+    text-overflow: ellipsis !important;
+    white-space: nowrap !important;
+  }
+
+  .home-screen .speech-home:not(.review-home) .recording-timer {
+    min-width: 42px !important;
+    padding: 5px 6px !important;
+    font-size: .62rem !important;
+    line-height: 1 !important;
+  }
+
+  .home-screen .speech-home:not(.review-home) .status-file,
+  .home-screen .speech-home:not(.review-home) .audio-player {
+    display: none !important;
+  }
+}
+
+/* ===== SPEECH PORTRAIT COMPACT FORM =====
+   Em telemoveis verticais, os selects sao pequenos; os labels nao devem
+   consumir uma linha inteira e roubar altura a frase/gravação. */
+@media (orientation: portrait) and (max-width: 620px) {
+  .home-screen .speech-home:not(.review-home) .google-home-main {
+    grid-template-rows: auto minmax(0, 1fr) !important;
+    gap: clamp(7px, 1.4vh, 10px) !important;
+    padding-top: 4px !important;
+    overflow: hidden !important;
+  }
+
+  .home-screen .speech-home:not(.review-home) .speech-intro-panel {
+    gap: 3px !important;
+  }
+
+  .home-screen .speech-home:not(.review-home) .speech-intro-panel h1 {
+    font-size: clamp(1.14rem, 5.6vw, 1.42rem) !important;
+    line-height: 1.05 !important;
+  }
+
+  .home-screen .speech-home:not(.review-home) .speech-intro-panel p {
+    font-size: .78rem !important;
+    line-height: 1.16 !important;
+  }
+
+  .home-screen .speech-home:not(.review-home) .speech-work-panel {
+    height: 100% !important;
+    min-height: 0 !important;
+    display: grid !important;
+    grid-template-rows: auto minmax(136px, 1fr) auto auto !important;
+    gap: 7px !important;
+    overflow: hidden !important;
+  }
+
+  .home-screen .speech-home:not(.review-home) .speech-config-card {
+    min-height: 0 !important;
+    padding: 7px !important;
+    border-radius: 12px !important;
+  }
+
+  .home-screen .speech-home:not(.review-home) .speech-config-grid {
+    display: grid !important;
+    grid-template-columns: .72fr .56fr minmax(0, 1.12fr) !important;
+    gap: 5px !important;
+    align-items: end !important;
+  }
+
+  .home-screen .speech-home:not(.review-home) .speech-config-grid label {
+    min-width: 0 !important;
+    gap: 2px !important;
+    font-size: .56rem !important;
+    line-height: 1 !important;
+    color: #64748b !important;
+    font-weight: 800 !important;
+    text-align: center !important;
+  }
+
+  .home-screen .speech-home:not(.review-home) .speech-config-grid label:last-child {
+    grid-column: auto !important;
+  }
+
+  .home-screen .speech-home:not(.review-home) .speech-config-grid select {
+    width: 100% !important;
+    min-width: 0 !important;
+    min-height: 31px !important;
+    padding: 6px 8px !important;
+    border-radius: 10px !important;
+    font-size: .82rem !important;
+    font-weight: 700 !important;
+  }
+
+  .home-screen .speech-home:not(.review-home) .speech-button-row {
+    margin-top: 6px !important;
+    gap: 5px !important;
+  }
+
+  .home-screen .speech-home:not(.review-home) .speech-button-row .soft-action {
+    min-height: 34px !important;
+    padding: 7px 8px !important;
+    font-size: .76rem !important;
+  }
+
+  .home-screen .speech-home:not(.review-home) .speech-phrase-card {
+    min-height: 0 !important;
+    height: 100% !important;
+    padding: 11px 10px !important;
+    overflow: hidden !important;
+  }
+
+  .home-screen .speech-home:not(.review-home) .speech-phrase-card strong {
+    font-size: clamp(.86rem, 4vw, 1rem) !important;
+    line-height: 1.16 !important;
+  }
+
+  .home-screen .speech-home:not(.review-home) .speech-record-card {
+    grid-template-columns: 36px minmax(0, 1fr) !important;
+    gap: 7px !important;
+    padding: 7px 8px !important;
+    border-radius: 12px !important;
+  }
+
+  .home-screen .speech-home:not(.review-home) .speech-record-icon {
+    width: 36px !important;
+    height: 36px !important;
+    border-radius: 10px !important;
+  }
+
+  .home-screen .speech-home:not(.review-home) .speech-record-copy {
+    gap: 4px !important;
+  }
+
+  .home-screen .speech-home:not(.review-home) .status-file {
+    display: none !important;
+  }
+
+  .home-screen .speech-home:not(.review-home) .recording-status-line {
+    flex-wrap: nowrap !important;
+    gap: 6px !important;
+  }
+
+  .home-screen .speech-home:not(.review-home) .status-pill {
+    min-width: 0 !important;
+    padding: 5px 8px !important;
+    font-size: .66rem !important;
+    white-space: nowrap !important;
+  }
+
+  .home-screen .speech-home:not(.review-home) .recording-timer {
+    min-width: 46px !important;
+    padding: 5px 7px !important;
+    font-size: .68rem !important;
+  }
+
+  .home-screen .speech-home:not(.review-home) .speech-record-controls {
+    grid-template-columns: repeat(4, minmax(0, 1fr)) !important;
+    gap: 5px !important;
+  }
+
+  .home-screen .speech-home:not(.review-home) .speech-record-controls button {
+    min-height: 34px !important;
+    padding: 7px 5px !important;
+    font-size: .72rem !important;
+  }
+}
+
+/* ===== LANDSCAPE CONSISTENCY FOR TABLETS / LARGE SCREENS =====
+   Mantem o mesmo desenho em horizontal sem deixar regras antigas de desktop
+   aumentar logo/titulos ate colidirem com o conteudo. */
+@media (orientation: landscape) and (min-height: 431px) {
+  .home-screen .google-home:not(.reader-home) {
+    width: 100vw !important;
+    max-width: 100vw !important;
+    height: 100dvh !important;
+    min-height: 100dvh !important;
+    margin: 0 !important;
+    border: 0 !important;
+    border-radius: 0 !important;
+    grid-template-rows: auto minmax(0, 1fr) auto !important;
+    overflow: hidden !important;
+  }
+
+  .home-screen .google-home:not(.reader-home) .google-home-header {
+    min-height: 0 !important;
+    padding: max(8px, env(safe-area-inset-top)) clamp(18px, 3vw, 34px) 4px !important;
+    align-items: flex-start !important;
+  }
+
+  .home-screen .google-home:not(.reader-home) .home-logo-mark {
+    width: clamp(30px, 5.8vh, 38px) !important;
+    height: clamp(30px, 5.8vh, 38px) !important;
+    min-width: clamp(30px, 5.8vh, 38px) !important;
+    border-radius: 10px !important;
+  }
+
+  .home-screen .google-home:not(.reader-home) .home-brand {
+    gap: 10px !important;
+    align-items: center !important;
+    min-width: 0 !important;
+  }
+
+  .home-screen .google-home:not(.reader-home) .home-brand-title {
+    font-size: clamp(1.45rem, 5vh, 2rem) !important;
+    line-height: 1 !important;
+    letter-spacing: 0 !important;
+    font-weight: 800 !important;
+  }
+
+  .home-screen .google-home:not(.reader-home) .home-brand-subtitle {
+    font-size: clamp(.76rem, 2.2vh, .95rem) !important;
+    line-height: 1.1 !important;
+  }
+
+  .home-screen .google-home:not(.reader-home) .home-help-btn {
+    width: clamp(30px, 5.4vh, 38px) !important;
+    height: clamp(30px, 5.4vh, 38px) !important;
+    min-width: clamp(30px, 5.4vh, 38px) !important;
+    padding: 6px !important;
+  }
+
+  .home-screen .google-home:not(.reader-home) .google-home-main {
+    min-height: 0 !important;
+    max-height: 100% !important;
+    padding: clamp(4px, 1.2vh, 8px) clamp(22px, 5vw, 54px) max(10px, env(safe-area-inset-bottom)) !important;
+    overflow: hidden !important;
+  }
+
+  .home-screen .google-home:not(.assisted-home):not(.speech-home):not(.review-home):not(.processing-home) .google-home-main,
+  .home-screen .assisted-home .google-home-main {
+    display: grid !important;
+    grid-template-columns: minmax(220px, .42fr) minmax(300px, .58fr) !important;
+    grid-template-rows: minmax(0, 1fr) !important;
+    align-items: center !important;
+    justify-content: center !important;
+    column-gap: clamp(22px, 5vw, 54px) !important;
+  }
+
+  .home-screen .home-intro-panel,
+  .home-screen .assisted-intro-panel {
+    grid-column: 1 !important;
+    grid-row: 1 !important;
+    align-self: center !important;
+    justify-self: stretch !important;
+    transform: none !important;
+    padding: 0 !important;
+    max-width: none !important;
+  }
+
+  .home-screen .home-badge {
+    position: static !important;
+    justify-self: start !important;
+    margin: 0 0 10px !important;
+    font-size: clamp(.72rem, 2.1vh, .92rem) !important;
+    padding: 6px 12px !important;
+  }
+
+  .home-screen .home-intro-panel h1,
+  .home-screen .assisted-intro-panel h1,
+  .home-screen .speech-intro-panel h1,
+  .home-screen .review-intro-panel h1 {
+    max-width: 14ch !important;
+    font-size: clamp(1.55rem, 7vh, 2.45rem) !important;
+    line-height: 1.06 !important;
+    letter-spacing: 0 !important;
+    margin: 0 !important;
+    transform: none !important;
+  }
+
+  .home-screen .home-intro-panel p,
+  .home-screen .assisted-intro-panel p,
+  .home-screen .speech-intro-panel p,
+  .home-screen .review-intro-panel p {
+    max-width: 32ch !important;
+    font-size: clamp(.86rem, 2.8vh, 1.08rem) !important;
+    line-height: 1.25 !important;
+    margin: 10px 0 0 !important;
+    transform: none !important;
+  }
+
+  .home-screen .home-actions-panel,
+  .home-screen .assisted-actions-panel {
+    grid-column: 2 !important;
+    grid-row: 1 !important;
+    width: min(100%, 520px) !important;
+    max-width: 520px !important;
+    justify-self: start !important;
+    align-self: center !important;
+    display: grid !important;
+    grid-template-rows: repeat(2, minmax(78px, auto)) !important;
+    gap: clamp(10px, 2.4vh, 14px) !important;
+    transform: none !important;
+    padding: 0 !important;
+  }
+
+  .home-screen .home-option-card,
+  .home-screen .assisted-option-card {
+    width: 100% !important;
+    min-height: clamp(78px, 16vh, 104px) !important;
+    max-height: none !important;
+    display: grid !important;
+    grid-template-columns: clamp(48px, 9vh, 66px) minmax(0, 1fr) clamp(28px, 5vh, 34px) !important;
+    gap: clamp(10px, 2vw, 16px) !important;
+    padding: clamp(10px, 2vh, 14px) !important;
+    align-items: center !important;
+    transform: none !important;
+  }
+
+  .home-screen .home-option-icon,
+  .home-screen .assisted-option-icon {
+    width: clamp(48px, 9vh, 66px) !important;
+    height: clamp(48px, 9vh, 66px) !important;
+    min-width: clamp(48px, 9vh, 66px) !important;
+  }
+
+  .home-screen .home-option-text strong,
+  .home-screen .assisted-option-card .home-option-text strong {
+    font-size: clamp(1rem, 3.4vh, 1.35rem) !important;
+    line-height: 1.08 !important;
+    letter-spacing: 0 !important;
+  }
+
+  .home-screen .home-option-text span,
+  .home-screen .assisted-option-card .home-option-text span {
+    font-size: clamp(.8rem, 2.6vh, 1rem) !important;
+    line-height: 1.22 !important;
+  }
+
+  .home-screen .home-recent-card,
+  .home-screen .home-safety-card {
+    display: none !important;
+  }
+
+  .home-screen .review-home .google-home-main {
+    display: grid !important;
+    grid-template-columns: minmax(220px, .34fr) minmax(280px, .66fr) !important;
+    grid-template-rows: minmax(0, 1fr) !important;
+    align-items: center !important;
+    justify-content: center !important;
+    column-gap: clamp(18px, 4vw, 48px) !important;
+  }
+
+  .home-screen .review-home .speech-intro-panel,
+  .home-screen .review-home .review-intro-panel {
+    display: block !important;
+    grid-column: 1 !important;
+    grid-row: 1 !important;
+    align-self: center !important;
+    justify-self: stretch !important;
+    padding: 0 !important;
+    transform: none !important;
+  }
+
+  .home-screen .review-home .review-panel {
+    grid-column: 2 !important;
+    grid-row: 1 !important;
+    width: min(100%, 520px) !important;
+    max-width: 520px !important;
+    height: min(100%, calc(100dvh - 98px)) !important;
+    min-height: 0 !important;
+    justify-self: start !important;
+    align-self: center !important;
+    display: grid !important;
+    grid-template-rows: minmax(0, 1fr) auto !important;
+    gap: 8px !important;
+    transform: none !important;
+    overflow: hidden !important;
+  }
+
+  .home-screen .review-home .review-preview-card {
+    width: 100% !important;
+    height: 100% !important;
+    min-height: 0 !important;
+    padding: 8px !important;
+    overflow: hidden !important;
+    display: grid !important;
+    place-items: center !important;
+  }
+
+  .home-screen .review-home .preview-image {
+    width: 100% !important;
+    height: 100% !important;
+    max-height: 100% !important;
+    object-fit: contain !important;
+  }
+
+  .home-screen .review-home .image-confirm-controls {
+    display: grid !important;
+    grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+    min-height: 42px !important;
+    gap: 8px !important;
+    padding: 0 !important;
+  }
+
+  .home-screen .processing-home .google-home-main {
+    display: grid !important;
+    grid-template-columns: minmax(0, 1fr) !important;
+    grid-template-rows: minmax(0, 1fr) !important;
+    place-items: center !important;
+  }
+
+  .home-screen .processing-home .processing-panel {
+    width: min(100%, 520px) !important;
+    max-width: 520px !important;
+    min-height: 0 !important;
+    padding: clamp(18px, 4vh, 30px) !important;
+    transform: none !important;
+  }
+
+  .home-screen .speech-home:not(.review-home) .google-home-main {
+    display: grid !important;
+    grid-template-columns: minmax(0, 1fr) !important;
+    grid-template-rows: minmax(0, 1fr) !important;
+    align-items: center !important;
+    justify-items: center !important;
+  }
+
+  .home-screen .speech-home:not(.review-home) .speech-intro-panel {
+    display: none !important;
+  }
+
+  .home-screen .speech-home:not(.review-home) .speech-work-panel {
+    grid-column: 1 !important;
+    grid-row: 1 !important;
+    width: min(100%, 860px) !important;
+    max-width: 860px !important;
+    height: auto !important;
+    max-height: calc(100dvh - 92px) !important;
+    display: grid !important;
+    grid-template-columns: minmax(0, 1fr) !important;
+    grid-template-rows: auto auto auto auto !important;
+    gap: 8px !important;
+    align-self: center !important;
+    justify-self: center !important;
+    transform: none !important;
+    overflow: hidden !important;
+  }
+
+  .home-screen .speech-home:not(.review-home) .speech-phrase-card,
+  .home-screen .speech-home:not(.review-home) .speech-config-card,
+  .home-screen .speech-home:not(.review-home) .speech-record-card,
+  .home-screen .speech-home:not(.review-home) .speech-record-controls {
+    grid-column: 1 !important;
+    width: 100% !important;
+    max-width: 100% !important;
+    transform: none !important;
+  }
+
+  .home-screen .speech-home:not(.review-home) .speech-phrase-card {
+    grid-row: 1 !important;
+    min-height: clamp(120px, 26vh, 188px) !important;
+    padding: clamp(12px, 2.6vh, 18px) !important;
+  }
+
+  .home-screen .speech-home:not(.review-home) .speech-phrase-card strong {
+    font-size: clamp(1.05rem, 3.5vh, 1.5rem) !important;
+    line-height: 1.18 !important;
+  }
+
+  .home-screen .speech-home:not(.review-home) .speech-config-card {
+    grid-row: 2 !important;
+    padding: 8px 10px !important;
+  }
+
+  .home-screen .speech-home:not(.review-home) .speech-config-grid {
+    display: grid !important;
+    grid-template-columns: .7fr .55fr minmax(0, 1.1fr) !important;
+    gap: 8px !important;
+  }
+
+  .home-screen .speech-home:not(.review-home) .speech-button-row {
+    display: grid !important;
+    grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+    gap: 8px !important;
+    margin-top: 8px !important;
+  }
+
+  .home-screen .speech-home:not(.review-home) .speech-record-card {
+    grid-row: 3 !important;
+    display: grid !important;
+    grid-template-columns: 42px minmax(0, 1fr) !important;
+    gap: 8px !important;
+    padding: 8px 10px !important;
+  }
+
+  .home-screen .speech-home:not(.review-home) .speech-record-icon {
+    width: 42px !important;
+    height: 42px !important;
+    border-radius: 11px !important;
+  }
+
+  .home-screen .speech-home:not(.review-home) .speech-record-controls {
+    grid-row: 4 !important;
+    display: grid !important;
+    grid-template-columns: repeat(4, minmax(0, 1fr)) !important;
+    gap: 8px !important;
+    padding: 0 !important;
+    background: transparent !important;
+    border: 0 !important;
+    box-shadow: none !important;
+  }
+
+  .home-screen .speech-home:not(.review-home) .speech-record-controls .speech-inline-generate {
+    display: none !important;
+  }
+}
+
+/* ===== FINAL SMALL-LANDSCAPE NORMALIZATION =====
+   Regra de fecho para tablets/telemoveis deitados com pouca altura.
+   O desenho deve manter proporcoes estaveis, sem header gigante nem
+   titulos a passar por cima do conteudo. */
+@media (orientation: landscape) and (max-height: 430px) {
+  .home-screen .google-home,
+  .home-screen .reader-home {
+    width: 100vw !important;
+    max-width: 100vw !important;
+    height: 100dvh !important;
+    min-height: 100dvh !important;
+    margin: 0 !important;
+    border: 0 !important;
+    border-radius: 0 !important;
+    grid-template-rows: auto minmax(0, 1fr) auto !important;
+    overflow: hidden !important;
+  }
+
+  .home-screen .google-home-header {
+    min-height: 0 !important;
+    padding: max(5px, env(safe-area-inset-top)) clamp(14px, 2.8vw, 22px) 2px !important;
+    align-items: flex-start !important;
+  }
+
+  .home-screen .home-logo-mark {
+    width: clamp(22px, 7.2vh, 30px) !important;
+    height: clamp(22px, 7.2vh, 30px) !important;
+    min-width: clamp(22px, 7.2vh, 30px) !important;
+    border-radius: 8px !important;
+  }
+
+  .home-screen .home-brand {
+    gap: 8px !important;
+    align-items: center !important;
+    min-width: 0 !important;
+  }
+
+  .home-screen .home-brand-title {
+    font-size: clamp(1.1rem, 6.3vh, 1.55rem) !important;
+    line-height: 1 !important;
+    letter-spacing: 0 !important;
+    font-weight: 800 !important;
+  }
+
+  .home-screen .home-brand-subtitle {
+    font-size: clamp(.58rem, 2.7vh, .76rem) !important;
+    line-height: 1.05 !important;
+  }
+
+  .home-screen .home-help-btn,
+  .home-screen .reader-header-btn {
+    width: clamp(24px, 7vh, 30px) !important;
+    height: clamp(24px, 7vh, 30px) !important;
+    min-width: clamp(24px, 7vh, 30px) !important;
+    padding: 5px !important;
+  }
+
+  .home-screen .reader-text-btn {
+    font-size: 1.1rem !important;
+  }
+
+  .home-screen .google-home-main {
+    min-height: 0 !important;
+    max-height: 100% !important;
+    padding: 3px clamp(16px, 4vw, 28px) max(5px, env(safe-area-inset-bottom)) !important;
+    overflow: hidden !important;
+  }
+
+  .home-screen .google-home:not(.assisted-home):not(.speech-home):not(.review-home):not(.processing-home) .google-home-main,
+  .home-screen .assisted-home .google-home-main {
+    display: grid !important;
+    grid-template-columns: minmax(190px, .42fr) minmax(300px, .58fr) !important;
+    grid-template-rows: minmax(0, 1fr) !important;
+    column-gap: clamp(16px, 4vw, 34px) !important;
+    align-items: center !important;
+    justify-content: center !important;
+  }
+
+  .home-screen .home-intro-panel,
+  .home-screen .assisted-intro-panel {
+    grid-column: 1 !important;
+    grid-row: 1 !important;
+    align-self: center !important;
+    justify-self: stretch !important;
+    padding: 0 !important;
+    transform: none !important;
+  }
+
+  .home-screen .home-badge {
+    position: static !important;
+    justify-self: start !important;
+    margin: 0 0 6px !important;
+    padding: 4px 9px !important;
+    font-size: clamp(.58rem, 2.9vh, .72rem) !important;
+    line-height: 1 !important;
+  }
+
+  .home-screen .home-intro-panel h1,
+  .home-screen .assisted-intro-panel h1 {
+    max-width: 12ch !important;
+    font-size: clamp(1.32rem, 8vh, 2rem) !important;
+    line-height: 1.05 !important;
+    letter-spacing: 0 !important;
+    margin: 0 !important;
+    transform: none !important;
+  }
+
+  .home-screen .home-intro-panel p,
+  .home-screen .assisted-intro-panel p {
+    max-width: 27ch !important;
+    font-size: clamp(.68rem, 3.5vh, .92rem) !important;
+    line-height: 1.22 !important;
+    margin: 8px 0 0 !important;
+    transform: none !important;
+  }
+
+  .home-screen .home-actions-panel,
+  .home-screen .assisted-actions-panel {
+    grid-column: 2 !important;
+    grid-row: 1 !important;
+    width: min(100%, 420px) !important;
+    max-width: 420px !important;
+    justify-self: start !important;
+    align-self: center !important;
+    display: grid !important;
+    grid-template-rows: repeat(2, minmax(68px, auto)) !important;
+    gap: clamp(8px, 2.3vh, 12px) !important;
+    padding: 0 !important;
+    transform: none !important;
+  }
+
+  .home-screen .home-option-card,
+  .home-screen .assisted-option-card {
+    width: 100% !important;
+    min-height: clamp(68px, 18vh, 86px) !important;
+    max-height: none !important;
+    display: grid !important;
+    grid-template-columns: clamp(38px, 11vh, 50px) minmax(0, 1fr) clamp(24px, 7vh, 30px) !important;
+    gap: clamp(8px, 2vw, 12px) !important;
+    padding: clamp(8px, 2vh, 11px) !important;
+    align-items: center !important;
+    transform: none !important;
+  }
+
+  .home-screen .home-option-icon,
+  .home-screen .assisted-option-icon {
+    width: clamp(38px, 11vh, 50px) !important;
+    height: clamp(38px, 11vh, 50px) !important;
+    min-width: clamp(38px, 11vh, 50px) !important;
+  }
+
+  .home-screen .home-option-arrow {
+    width: clamp(24px, 7vh, 30px) !important;
+    height: clamp(24px, 7vh, 30px) !important;
+    min-width: clamp(24px, 7vh, 30px) !important;
+    font-size: .9rem !important;
+  }
+
+  .home-screen .home-option-text strong,
+  .home-screen .assisted-option-card .home-option-text strong {
+    font-size: clamp(.9rem, 4.2vh, 1.16rem) !important;
+    line-height: 1.08 !important;
+    letter-spacing: 0 !important;
+  }
+
+  .home-screen .home-option-text span,
+  .home-screen .assisted-option-card .home-option-text span {
+    font-size: clamp(.66rem, 3.2vh, .86rem) !important;
+    line-height: 1.18 !important;
+  }
+
+  .home-screen .home-recent-card,
+  .home-screen .home-safety-card {
+    display: none !important;
+  }
+
+  .home-screen .review-home .google-home-main,
+  .home-screen .processing-home .google-home-main {
+    display: grid !important;
+    grid-template-columns: minmax(0, 1fr) !important;
+    grid-template-rows: minmax(0, 1fr) !important;
+    place-items: center !important;
+    padding: 4px clamp(18px, 4vw, 30px) max(7px, env(safe-area-inset-bottom)) !important;
+  }
+
+  .home-screen .review-home .speech-intro-panel,
+  .home-screen .review-home .review-intro-panel {
+    display: none !important;
+  }
+
+  .home-screen .review-home .review-panel {
+    grid-column: 1 !important;
+    grid-row: 1 !important;
+    width: min(100%, 520px) !important;
+    max-width: 520px !important;
+    height: 100% !important;
+    min-height: 0 !important;
+    display: grid !important;
+    grid-template-rows: minmax(0, 1fr) 34px !important;
+    gap: 6px !important;
+    justify-self: center !important;
+    align-self: stretch !important;
+    transform: none !important;
+    overflow: hidden !important;
+  }
+
+  .home-screen .review-home .review-preview-card {
+    width: 100% !important;
+    height: 100% !important;
+    min-height: 0 !important;
+    padding: 6px !important;
+    display: grid !important;
+    place-items: center !important;
+    overflow: hidden !important;
+  }
+
+  .home-screen .review-home .preview-image {
+    width: 100% !important;
+    height: 100% !important;
+    max-height: 100% !important;
+    object-fit: contain !important;
+  }
+
+  .home-screen .review-home .image-confirm-controls {
+    display: grid !important;
+    grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+    gap: 6px !important;
+    min-height: 34px !important;
+    padding: 0 !important;
+    transform: none !important;
+  }
+
+  .home-screen .review-home .image-confirm-controls button {
+    min-height: 34px !important;
+    padding: 6px 8px !important;
+    font-size: .74rem !important;
+  }
+
+  .home-screen .processing-home .processing-panel {
+    width: min(100%, 480px) !important;
+    max-width: 480px !important;
+    padding: clamp(16px, 5vh, 26px) !important;
+    transform: none !important;
+  }
+
+  .home-screen .reader-home .google-home-main,
+  .home-screen .reader-home.settings-open:not(.speech-result-home) .reader-main {
+    display: grid !important;
+    grid-template-columns: minmax(0, 1fr) !important;
+    grid-template-rows: minmax(0, 1fr) auto !important;
+    gap: 4px !important;
+    width: 100% !important;
+    max-width: 100% !important;
+    min-width: 0 !important;
+    padding: 3px clamp(14px, 3vw, 24px) max(6px, env(safe-area-inset-bottom)) !important;
+    overflow: hidden !important;
+    align-items: stretch !important;
+    justify-items: stretch !important;
+  }
+
+  .home-screen .reader-home.settings-open:not(.speech-result-home) .reader-top {
+    grid-column: 1 !important;
+    grid-row: 1 !important;
+    width: 100% !important;
+    max-width: 100% !important;
+    min-height: 0 !important;
+    height: 100% !important;
+    padding: 8px 6px !important;
+    display: grid !important;
+    place-items: center stretch !important;
+    overflow: hidden !important;
+  }
+
+  .home-screen .reader-home.settings-open:not(.speech-result-home) .reading-focus,
+  .home-screen .reader-home.settings-open:not(.speech-result-home) .line-focus,
+  .home-screen .reader-home.settings-open:not(.speech-result-home) .word-focus,
+  .home-screen .reader-home.settings-open:not(.speech-result-home) .word-context {
+    width: 100% !important;
+    max-width: 100% !important;
+    text-align: left !important;
+  }
+
+  .home-screen .reader-home.settings-open:not(.speech-result-home) .line-focus {
+    font-size: clamp(.86rem, 4vh, 1.05rem) !important;
+    line-height: 1.18 !important;
+  }
+
+  .home-screen .reader-home.settings-open:not(.speech-result-home) .reader-bottom {
+    grid-column: 1 !important;
+    grid-row: 2 !important;
+    width: 100% !important;
+    max-width: 100% !important;
+    min-width: 0 !important;
+    height: auto !important;
+    max-height: 152px !important;
+    padding: 0 !important;
+    justify-self: stretch !important;
+    align-self: end !important;
+    overflow: hidden !important;
+  }
+
+  .home-screen .reader-home.settings-open:not(.speech-result-home) .reader-control-stack {
+    gap: 4px !important;
+    width: 100% !important;
+  }
+
+  .home-screen .reader-home.settings-open:not(.speech-result-home) .transport-row {
+    min-height: 26px !important;
+    gap: 9px !important;
+  }
+
+  .home-screen .reader-home.settings-open:not(.speech-result-home) .transport-row .round-btn,
+  .home-screen .reader-home.settings-open:not(.speech-result-home) .transport-row .play-btn {
+    width: 26px !important;
+    min-width: 26px !important;
+    height: 26px !important;
+    min-height: 26px !important;
+    padding: 0 !important;
+    font-size: .85rem !important;
+  }
+
+  .home-screen .reader-home.settings-open:not(.speech-result-home) .progress-label {
+    font-size: .66rem !important;
+    line-height: 1 !important;
+  }
+
+  .home-screen .reader-home.settings-open:not(.speech-result-home) .progress-line {
+    height: 4px !important;
+  }
+
+  .home-screen .reader-home.settings-open:not(.speech-result-home) .controls-compact {
+    display: grid !important;
+    grid-template-columns: repeat(10, minmax(0, 1fr)) !important;
+    gap: 4px !important;
+    width: 100% !important;
+    overflow: hidden !important;
+  }
+
+  .home-screen .reader-home.settings-open:not(.speech-result-home) .controls-compact .pill-btn {
+    min-width: 0 !important;
+    min-height: 24px !important;
+    padding: 3px 4px !important;
+    border-radius: 999px !important;
+    font-size: clamp(.48rem, 1.8vh, .62rem) !important;
+    line-height: 1 !important;
+    white-space: nowrap !important;
+    overflow: hidden !important;
+    text-overflow: clip !important;
+  }
+
+  .home-screen .reader-home.settings-open:not(.speech-result-home) .settings-panel {
+    width: 100% !important;
+    height: 54px !important;
+    min-height: 54px !important;
+    max-height: 54px !important;
+    display: grid !important;
+    grid-template-columns: 1fr 1fr 1.05fr !important;
+    gap: 5px !important;
+    padding: 5px !important;
+    overflow: hidden !important;
+  }
+
+  .home-screen .reader-home.settings-open:not(.speech-result-home) .setting-block {
+    gap: 2px !important;
+    min-width: 0 !important;
+  }
+
+  .home-screen .reader-home.settings-open:not(.speech-result-home) .setting-block label {
+    font-size: .58rem !important;
+    line-height: 1 !important;
+  }
+
+  .home-screen .reader-home.settings-open:not(.speech-result-home) .setting-block input {
+    height: 18px !important;
+  }
+
+  .home-screen .reader-home.settings-open:not(.speech-result-home) .setting-block select {
+    min-height: 24px !important;
+    padding: 3px 6px !important;
+    font-size: .58rem !important;
+  }
+}
+
+/* ===== TABLET / MEDIUM LANDSCAPE RESTORE =====
+   Entre 331px e 430px de altura ja ha espaco para o desenho largo.
+   O modo ultra-compacto fica reservado para telefones realmente baixos. */
+@media (orientation: landscape) and (min-height: 331px) and (max-height: 430px) {
+  .home-screen .google-home:not(.reader-home),
+  .home-screen .reader-home {
+    grid-template-rows: auto minmax(0, 1fr) auto !important;
+  }
+
+  .home-screen .google-home-header {
+    padding: max(12px, env(safe-area-inset-top)) clamp(24px, 4vw, 42px) 6px !important;
+  }
+
+  .home-screen .home-logo-mark {
+    width: clamp(36px, 9vh, 52px) !important;
+    height: clamp(36px, 9vh, 52px) !important;
+    min-width: clamp(36px, 9vh, 52px) !important;
+    border-radius: 13px !important;
+  }
+
+  .home-screen .home-brand-title {
+    font-size: clamp(1.55rem, 7vh, 2.45rem) !important;
+    line-height: 1 !important;
+  }
+
+  .home-screen .home-brand-subtitle {
+    font-size: clamp(.78rem, 3vh, 1rem) !important;
+  }
+
+  .home-screen .home-help-btn,
+  .home-screen .reader-header-btn {
+    width: clamp(34px, 8vh, 44px) !important;
+    height: clamp(34px, 8vh, 44px) !important;
+    min-width: clamp(34px, 8vh, 44px) !important;
+  }
+
+  .home-screen .google-home:not(.assisted-home):not(.speech-home):not(.review-home):not(.processing-home) .google-home-main,
+  .home-screen .assisted-home .google-home-main {
+    display: grid !important;
+    grid-template-columns: minmax(210px, .36fr) minmax(330px, .64fr) !important;
+    grid-template-rows: minmax(0, 1fr) !important;
+    column-gap: clamp(24px, 5vw, 52px) !important;
+    align-items: center !important;
+    justify-content: center !important;
+    padding: 8px clamp(26px, 5vw, 56px) max(12px, env(safe-area-inset-bottom)) !important;
+  }
+
+  .home-screen .home-intro-panel,
+  .home-screen .assisted-intro-panel {
+    grid-column: 1 !important;
+    grid-row: 1 !important;
+    align-self: center !important;
+    justify-self: stretch !important;
+    padding: 0 !important;
+    transform: none !important;
+  }
+
+  .home-screen .home-badge {
+    position: static !important;
+    justify-self: start !important;
+    margin: 0 0 10px !important;
+    padding: 6px 12px !important;
+    font-size: clamp(.72rem, 2.6vh, .95rem) !important;
+  }
+
+  .home-screen .home-intro-panel h1,
+  .home-screen .assisted-intro-panel h1 {
+    max-width: 14ch !important;
+    font-size: clamp(1.65rem, 8.4vh, 2.55rem) !important;
+    line-height: 1.06 !important;
+    letter-spacing: 0 !important;
+    margin: 0 !important;
+  }
+
+  .home-screen .home-intro-panel p,
+  .home-screen .assisted-intro-panel p {
+    max-width: 30ch !important;
+    font-size: clamp(.84rem, 3.2vh, 1.05rem) !important;
+    line-height: 1.24 !important;
+    margin: 10px 0 0 !important;
+  }
+
+  .home-screen .home-actions-panel,
+  .home-screen .assisted-actions-panel {
+    grid-column: 2 !important;
+    grid-row: 1 !important;
+    width: min(100%, 690px) !important;
+    max-width: 690px !important;
+    justify-self: stretch !important;
+    align-self: center !important;
+    display: grid !important;
+    grid-template-rows: repeat(2, minmax(86px, auto)) !important;
+    gap: clamp(10px, 2.8vh, 16px) !important;
+    padding: 0 !important;
+    transform: none !important;
+  }
+
+  .home-screen .home-option-card,
+  .home-screen .assisted-option-card {
+    min-height: clamp(86px, 22vh, 118px) !important;
+    grid-template-columns: clamp(52px, 12vh, 76px) minmax(0, 1fr) clamp(30px, 7vh, 40px) !important;
+    gap: clamp(12px, 2.4vw, 18px) !important;
+    padding: clamp(12px, 2.7vh, 18px) !important;
+  }
+
+  .home-screen .home-option-icon,
+  .home-screen .assisted-option-icon {
+    width: clamp(52px, 12vh, 76px) !important;
+    height: clamp(52px, 12vh, 76px) !important;
+    min-width: clamp(52px, 12vh, 76px) !important;
+  }
+
+  .home-screen .home-option-text strong,
+  .home-screen .assisted-option-card .home-option-text strong {
+    font-size: clamp(1.05rem, 4.6vh, 1.55rem) !important;
+    line-height: 1.08 !important;
+  }
+
+  .home-screen .home-option-text span,
+  .home-screen .assisted-option-card .home-option-text span {
+    font-size: clamp(.82rem, 3.2vh, 1.05rem) !important;
+    line-height: 1.2 !important;
+  }
+
+  .home-screen .review-home .google-home-main {
+    display: grid !important;
+    grid-template-columns: minmax(0, 1fr) !important;
+    grid-template-rows: minmax(0, 1fr) !important;
+    place-items: stretch center !important;
+    padding: 10px clamp(28px, 5vw, 56px) max(12px, env(safe-area-inset-bottom)) !important;
+  }
+
+  .home-screen .review-home .speech-intro-panel,
+  .home-screen .review-home .review-intro-panel {
+    display: none !important;
+  }
+
+  .home-screen .review-home .review-panel {
+    width: min(100%, 1080px) !important;
+    max-width: 1080px !important;
+    height: 100% !important;
+    grid-template-rows: minmax(0, 1fr) clamp(42px, 9vh, 56px) !important;
+    gap: 10px !important;
+    justify-self: center !important;
+    align-self: stretch !important;
+  }
+
+  .home-screen .review-home .review-preview-card {
+    padding: 10px !important;
+  }
+
+  .home-screen .review-home .image-confirm-controls button {
+    min-height: clamp(42px, 9vh, 56px) !important;
+    font-size: clamp(.9rem, 3.4vh, 1.16rem) !important;
+  }
+
+  .home-screen .reader-home.settings-open:not(.speech-result-home) .reader-main {
+    display: grid !important;
+    grid-template-columns: minmax(0, 1fr) !important;
+    grid-template-rows: minmax(0, 1fr) auto !important;
+    padding: 8px clamp(28px, 5vw, 56px) max(10px, env(safe-area-inset-bottom)) !important;
+    gap: 8px !important;
+    justify-items: stretch !important;
+  }
+
+  .home-screen .reader-home.settings-open:not(.speech-result-home) .reader-top,
+  .home-screen .reader-home.settings-open:not(.speech-result-home) .reader-bottom {
+    width: min(100%, 1080px) !important;
+    max-width: 1080px !important;
+    justify-self: center !important;
+  }
+
+  .home-screen .reader-home.settings-open:not(.speech-result-home) .line-focus {
+    font-size: clamp(.92rem, 3.6vh, 1.25rem) !important;
+    line-height: 1.2 !important;
+    text-align: left !important;
+  }
+
+  .home-screen .reader-home.settings-open:not(.speech-result-home) .reader-bottom {
+    max-height: 190px !important;
+    padding: 0 !important;
+  }
+
+  .home-screen .reader-home.settings-open:not(.speech-result-home) .controls-compact {
+    grid-template-columns: repeat(10, minmax(0, 1fr)) !important;
+    gap: 6px !important;
+  }
+
+  .home-screen .reader-home.settings-open:not(.speech-result-home) .controls-compact .pill-btn {
+    min-height: 32px !important;
+    padding: 6px 8px !important;
+    font-size: clamp(.62rem, 2.2vh, .82rem) !important;
+  }
+
+  .home-screen .reader-home.settings-open:not(.speech-result-home) .settings-panel {
+    height: 74px !important;
+    min-height: 74px !important;
+    max-height: 74px !important;
+    padding: 8px !important;
+  }
+}
+
+/* ===== VIEWPORT CLASS CONTRACT =====
+   Esta e a camada que deve mandar: small/medium/large sao calculados em JS
+   com largura+altura reais, evitando que tablet e telefone caiam no mesmo
+   comportamento por acidente. */
+.layout-landscape.layout-medium .home-screen .google-home,
+.layout-landscape.layout-large .home-screen .google-home {
+  width: 100vw !important;
+  max-width: 100vw !important;
+  height: 100dvh !important;
+  min-height: 100dvh !important;
+  margin: 0 !important;
+  border-radius: 0 !important;
+  overflow: hidden !important;
+  grid-template-rows: auto minmax(0, 1fr) auto !important;
+  background: #fff !important;
+}
+
+.layout-landscape.layout-medium,
+.layout-landscape.layout-large,
+.layout-landscape.layout-medium .app-shell,
+.layout-landscape.layout-large .app-shell,
+.layout-landscape.layout-medium .home-screen,
+.layout-landscape.layout-large .home-screen {
+  width: 100vw !important;
+  max-width: 100vw !important;
+  height: 100dvh !important;
+  min-height: 100dvh !important;
+  margin: 0 !important;
+  padding: 0 !important;
+  overflow: hidden !important;
+  background: #fff !important;
+}
+
+.layout-landscape.layout-medium .home-screen .google-home-header,
+.layout-landscape.layout-large .home-screen .google-home-header {
+  padding: max(8px, env(safe-area-inset-top)) clamp(24px, 4vw, 46px) 4px !important;
+  min-height: 0 !important;
+}
+
+.layout-landscape.layout-medium .home-screen .home-logo-mark,
+.layout-landscape.layout-large .home-screen .home-logo-mark {
+  width: clamp(34px, 8.5vh, 54px) !important;
+  height: clamp(34px, 8.5vh, 54px) !important;
+  min-width: clamp(34px, 8.5vh, 54px) !important;
+}
+
+.layout-landscape.layout-medium .home-screen .home-brand-title,
+.layout-landscape.layout-large .home-screen .home-brand-title {
+  font-size: clamp(1.45rem, 6.2vh, 2.35rem) !important;
+  line-height: 1 !important;
+  letter-spacing: 0 !important;
+}
+
+.layout-landscape.layout-medium .home-screen .home-brand-subtitle,
+.layout-landscape.layout-large .home-screen .home-brand-subtitle {
+  font-size: clamp(.76rem, 2.5vh, 1rem) !important;
+  line-height: 1.1 !important;
+}
+
+.layout-landscape.layout-medium .home-screen .home-help-btn,
+.layout-landscape.layout-large .home-screen .home-help-btn,
+.layout-landscape.layout-medium .home-screen .reader-header-btn,
+.layout-landscape.layout-large .home-screen .reader-header-btn {
+  width: clamp(32px, 7.4vh, 44px) !important;
+  height: clamp(32px, 7.4vh, 44px) !important;
+  min-width: clamp(32px, 7.4vh, 44px) !important;
+}
+
+.layout-landscape.layout-medium .home-screen .google-home:not(.reader-home):not(.review-home):not(.processing-home) .google-home-main,
+.layout-landscape.layout-large .home-screen .google-home:not(.reader-home):not(.review-home):not(.processing-home) .google-home-main {
+  display: grid !important;
+  grid-template-columns: minmax(210px, .36fr) minmax(330px, .64fr) !important;
+  grid-template-rows: minmax(0, 1fr) !important;
+  gap: clamp(24px, 5vw, 64px) !important;
+  align-items: center !important;
+  justify-content: center !important;
+  padding: 4px clamp(28px, 5vw, 60px) max(8px, env(safe-area-inset-bottom)) !important;
+  overflow: hidden !important;
+  height: 100% !important;
+}
+
+.layout-landscape.layout-large .home-screen .google-home:not(.reader-home):not(.review-home):not(.processing-home) .google-home-main {
+  grid-template-columns: minmax(300px, .34fr) minmax(560px, .66fr) !important;
+}
+
+.layout-landscape.layout-medium .home-screen .home-intro-panel,
+.layout-landscape.layout-large .home-screen .home-intro-panel {
+  grid-column: 1 !important;
+  grid-row: 1 !important;
+  align-self: center !important;
+  justify-self: stretch !important;
+  padding: 0 !important;
+  transform: none !important;
+}
+
+.layout-landscape.layout-medium .home-screen .home-badge,
+.layout-landscape.layout-large .home-screen .home-badge {
+  position: static !important;
+  justify-self: start !important;
+  margin: 0 0 10px !important;
+  padding: 5px 11px !important;
+}
+
+.layout-landscape.layout-medium .home-screen .home-intro-panel h1,
+.layout-landscape.layout-large .home-screen .home-intro-panel h1 {
+  max-width: 14ch !important;
+  font-size: clamp(1.55rem, 7.2vh, 2.5rem) !important;
+  line-height: 1.06 !important;
+  letter-spacing: 0 !important;
+  margin: 0 !important;
+  transform: none !important;
+}
+
+.layout-landscape.layout-medium .home-screen .home-intro-panel p,
+.layout-landscape.layout-large .home-screen .home-intro-panel p {
+  max-width: 31ch !important;
+  font-size: clamp(.78rem, 2.8vh, 1.05rem) !important;
+  line-height: 1.24 !important;
+  margin: 10px 0 0 !important;
+  transform: none !important;
+}
+
+.layout-landscape.layout-medium .home-screen .home-actions-panel,
+.layout-landscape.layout-large .home-screen .home-actions-panel {
+  grid-column: 2 !important;
+  grid-row: 1 !important;
+  width: 100% !important;
+  max-width: 720px !important;
+  justify-self: stretch !important;
+  align-self: center !important;
+  display: grid !important;
+  grid-template-rows: repeat(2, minmax(72px, auto)) !important;
+  gap: clamp(8px, 2vh, 14px) !important;
+  padding: 0 !important;
+  transform: none !important;
+}
+
+.layout-landscape.layout-medium .home-screen .home-option-card,
+.layout-landscape.layout-large .home-screen .home-option-card {
+  width: 100% !important;
+  min-height: clamp(72px, 18vh, 110px) !important;
+  grid-template-columns: clamp(44px, 10vh, 70px) minmax(0, 1fr) clamp(28px, 6vh, 38px) !important;
+  gap: clamp(12px, 2.2vw, 18px) !important;
+  padding: clamp(12px, 2.6vh, 18px) !important;
+}
+
+.layout-landscape.layout-medium .home-screen .home-option-icon,
+.layout-landscape.layout-large .home-screen .home-option-icon {
+  width: clamp(44px, 10vh, 70px) !important;
+  height: clamp(44px, 10vh, 70px) !important;
+  min-width: clamp(44px, 10vh, 70px) !important;
+}
+
+.layout-landscape.layout-medium .home-screen .home-option-text strong,
+.layout-landscape.layout-large .home-screen .home-option-text strong {
+  font-size: clamp(1rem, 4vh, 1.45rem) !important;
+  line-height: 1.08 !important;
+}
+
+.layout-landscape.layout-medium .home-screen .home-option-text span,
+.layout-landscape.layout-large .home-screen .home-option-text span {
+  font-size: clamp(.76rem, 2.9vh, 1.02rem) !important;
+  line-height: 1.2 !important;
+}
+
+.layout-landscape.layout-medium .home-screen .home-recent-card,
+.layout-landscape.layout-large .home-screen .home-recent-card,
+.layout-landscape.layout-medium .home-screen .home-safety-card,
+.layout-landscape.layout-large .home-screen .home-safety-card {
+  display: none !important;
+}
+
+.layout-landscape.layout-medium .home-screen .review-home .google-home-main,
+.layout-landscape.layout-large .home-screen .review-home .google-home-main,
+.layout-landscape.layout-medium .home-screen .processing-home .google-home-main,
+.layout-landscape.layout-large .home-screen .processing-home .google-home-main {
+  display: grid !important;
+  grid-template-columns: minmax(0, 1fr) !important;
+  grid-template-rows: minmax(0, 1fr) !important;
+  place-items: stretch center !important;
+  padding: 10px clamp(28px, 5vw, 56px) max(12px, env(safe-area-inset-bottom)) !important;
+}
+
+.layout-landscape.layout-medium .home-screen .review-home .speech-intro-panel,
+.layout-landscape.layout-large .home-screen .review-home .speech-intro-panel,
+.layout-landscape.layout-medium .home-screen .review-home .review-intro-panel,
+.layout-landscape.layout-large .home-screen .review-home .review-intro-panel {
+  display: none !important;
+}
+
+.layout-landscape.layout-medium .home-screen .review-home .review-panel,
+.layout-landscape.layout-large .home-screen .review-home .review-panel {
+  width: min(100%, 1080px) !important;
+  max-width: 1080px !important;
+  height: 100% !important;
+  display: grid !important;
+  grid-template-rows: minmax(0, 1fr) clamp(42px, 9vh, 56px) !important;
+  gap: 10px !important;
+  justify-self: center !important;
+  align-self: stretch !important;
+  overflow: hidden !important;
+}
+
+.layout-landscape.layout-medium .home-screen .review-home .review-preview-card,
+.layout-landscape.layout-large .home-screen .review-home .review-preview-card {
+  width: 100% !important;
+  height: 100% !important;
+  min-height: 0 !important;
+  padding: 10px !important;
+  display: grid !important;
+  place-items: center !important;
+  overflow: hidden !important;
+}
+
+.layout-landscape.layout-medium .home-screen .review-home .preview-image,
+.layout-landscape.layout-large .home-screen .review-home .preview-image {
+  width: 100% !important;
+  height: 100% !important;
+  max-height: 100% !important;
+  object-fit: contain !important;
+}
+
+.layout-landscape.layout-medium .home-screen .processing-home .processing-panel,
+.layout-landscape.layout-large .home-screen .processing-home .processing-panel {
+  width: min(100%, 540px) !important;
+  max-width: 540px !important;
+  justify-self: center !important;
+  align-self: center !important;
+  transform: none !important;
+}
+
+.layout-landscape.layout-medium .home-screen .reader-home .reader-main,
+.layout-landscape.layout-large .home-screen .reader-home .reader-main {
+  width: 100% !important;
+  max-width: 100% !important;
+  display: grid !important;
+  grid-template-columns: minmax(0, 1fr) !important;
+  grid-template-rows: minmax(0, 1fr) auto !important;
+  gap: 8px !important;
+  padding: 8px clamp(28px, 5vw, 56px) max(10px, env(safe-area-inset-bottom)) !important;
+  justify-items: center !important;
+  align-items: stretch !important;
+  overflow: hidden !important;
+}
+
+.layout-landscape.layout-medium .home-screen .reader-home .reader-top,
+.layout-landscape.layout-large .home-screen .reader-home .reader-top,
+.layout-landscape.layout-medium .home-screen .reader-home .reader-bottom,
+.layout-landscape.layout-large .home-screen .reader-home .reader-bottom {
+  width: min(100%, 1080px) !important;
+  max-width: 1080px !important;
+  justify-self: center !important;
+}
+
+.layout-landscape.layout-medium .home-screen .reader-home .reader-bottom,
+.layout-landscape.layout-large .home-screen .reader-home .reader-bottom {
+  max-height: 190px !important;
+  padding: 0 !important;
+}
+
+.layout-landscape.layout-medium .home-screen .reader-home .controls-compact,
+.layout-landscape.layout-large .home-screen .reader-home .controls-compact {
+  grid-template-columns: repeat(10, minmax(0, 1fr)) !important;
+  gap: 6px !important;
+}
+
+/* ===== TABLET LANDSCAPE TYPOGRAPHY LOCK =====
+   Em tablets horizontais a altura continua baixa, mas a largura e grande.
+   A tipografia nao pode escalar por vh; fica limitada por rem. */
+.layout-landscape.layout-medium .home-screen .home-logo-mark,
+.layout-landscape.layout-large .home-screen .home-logo-mark {
+  width: clamp(30px, 4vw, 44px) !important;
+  height: clamp(30px, 4vw, 44px) !important;
+  min-width: clamp(30px, 4vw, 44px) !important;
+}
+
+.layout-landscape.layout-medium .home-screen .home-brand-title,
+.layout-landscape.layout-large .home-screen .home-brand-title {
+  font-size: clamp(1.35rem, 3vw, 1.95rem) !important;
+  line-height: 1 !important;
+  letter-spacing: 0 !important;
+}
+
+.layout-landscape.layout-medium .home-screen .home-brand-subtitle,
+.layout-landscape.layout-large .home-screen .home-brand-subtitle {
+  font-size: clamp(.72rem, 1.6vw, .92rem) !important;
+  line-height: 1.1 !important;
+}
+
+.layout-landscape.layout-medium .home-screen .google-home-header,
+.layout-landscape.layout-large .home-screen .google-home-header {
+  padding: max(10px, env(safe-area-inset-top)) clamp(24px, 4vw, 42px) 4px !important;
+}
+
+.layout-landscape.layout-medium .home-screen .home-intro-panel h1,
+.layout-landscape.layout-large .home-screen .home-intro-panel h1 {
+  font-size: clamp(1.45rem, 3.4vw, 2.15rem) !important;
+  line-height: 1.08 !important;
+  max-width: 15ch !important;
+}
+
+.layout-landscape.layout-medium .home-screen .home-intro-panel p,
+.layout-landscape.layout-large .home-screen .home-intro-panel p {
+  font-size: clamp(.78rem, 1.65vw, .98rem) !important;
+  line-height: 1.25 !important;
+  max-width: 32ch !important;
+}
+
+.layout-landscape.layout-medium .home-screen .home-option-text strong,
+.layout-landscape.layout-large .home-screen .home-option-text strong,
+.layout-landscape.layout-medium .home-screen .assisted-option-card .home-option-text strong,
+.layout-landscape.layout-large .home-screen .assisted-option-card .home-option-text strong {
+  font-size: clamp(1rem, 2.35vw, 1.42rem) !important;
+  line-height: 1.1 !important;
+}
+
+.layout-landscape.layout-medium .home-screen .home-option-text span,
+.layout-landscape.layout-large .home-screen .home-option-text span,
+.layout-landscape.layout-medium .home-screen .assisted-option-card .home-option-text span,
+.layout-landscape.layout-large .home-screen .assisted-option-card .home-option-text span {
+  font-size: clamp(.74rem, 1.75vw, .98rem) !important;
+  line-height: 1.22 !important;
+}
+
+.layout-landscape.layout-medium .home-screen .home-actions-panel,
+.layout-landscape.layout-large .home-screen .home-actions-panel,
+.layout-landscape.layout-medium .home-screen .assisted-actions-panel,
+.layout-landscape.layout-large .home-screen .assisted-actions-panel {
+  max-width: min(64vw, 720px) !important;
+}
+
+.layout-landscape.layout-medium .home-screen .home-option-card,
+.layout-landscape.layout-large .home-screen .home-option-card,
+.layout-landscape.layout-medium .home-screen .assisted-option-card,
+.layout-landscape.layout-large .home-screen .assisted-option-card {
+  min-height: clamp(76px, 16vh, 104px) !important;
+  grid-template-columns: clamp(42px, 5vw, 62px) minmax(0, 1fr) clamp(28px, 3.8vw, 36px) !important;
+}
+
+.layout-landscape.layout-medium .home-screen .home-option-icon,
+.layout-landscape.layout-large .home-screen .home-option-icon,
+.layout-landscape.layout-medium .home-screen .assisted-option-icon,
+.layout-landscape.layout-large .home-screen .assisted-option-icon {
+  width: clamp(42px, 5vw, 62px) !important;
+  height: clamp(42px, 5vw, 62px) !important;
+  min-width: clamp(42px, 5vw, 62px) !important;
+}
+
+.layout-landscape.layout-medium .home-screen .reader-home .reader-main,
+.layout-landscape.layout-large .home-screen .reader-home .reader-main {
+  display: grid !important;
+  grid-template-columns: minmax(0, 1fr) !important;
+  grid-template-rows: minmax(0, 1fr) auto !important;
+  justify-items: center !important;
+  padding-inline: clamp(28px, 5vw, 56px) !important;
+}
+
+.layout-landscape.layout-medium .home-screen .reader-home .reader-top,
+.layout-landscape.layout-large .home-screen .reader-home .reader-top,
+.layout-landscape.layout-medium .home-screen .reader-home .reader-bottom,
+.layout-landscape.layout-large .home-screen .reader-home .reader-bottom,
+.layout-landscape.layout-medium .home-screen .reader-home .reader-control-stack,
+.layout-landscape.layout-large .home-screen .reader-home .reader-control-stack {
+  width: min(100%, 1080px) !important;
+  max-width: 1080px !important;
+  justify-self: center !important;
+}
+
+.layout-landscape.layout-medium .home-screen .reader-home .line-focus,
+.layout-landscape.layout-large .home-screen .reader-home .line-focus,
+.layout-landscape.layout-medium .home-screen .reader-home .reading-focus,
+.layout-landscape.layout-large .home-screen .reader-home .reading-focus {
+  width: 100% !important;
+  max-width: 100% !important;
+  font-size: clamp(.9rem, 1.7vw, 1.14rem) !important;
+  line-height: 1.22 !important;
+  text-align: left !important;
+}
+
+@media (orientation: landscape) and (min-width: 900px) {
+  .home-screen .google-home {
+    width: 100vw !important;
+    max-width: 100vw !important;
+    height: 100dvh !important;
+    min-height: 100dvh !important;
+    grid-template-rows: auto minmax(0, 1fr) auto !important;
+    overflow: hidden !important;
+    background: #fff !important;
+  }
+
+  .home-screen .google-home-header {
+    padding: max(10px, env(safe-area-inset-top)) clamp(26px, 4vw, 48px) 4px !important;
+    min-height: 0 !important;
+  }
+
+  .home-screen .home-logo-mark {
+    width: clamp(30px, 4vw, 44px) !important;
+    height: clamp(30px, 4vw, 44px) !important;
+    min-width: clamp(30px, 4vw, 44px) !important;
+  }
+
+  .home-screen .home-brand-title {
+    font-size: clamp(1.35rem, 3vw, 1.95rem) !important;
+    line-height: 1 !important;
+    letter-spacing: 0 !important;
+  }
+
+  .home-screen .home-brand-subtitle {
+    font-size: clamp(.72rem, 1.6vw, .92rem) !important;
+    line-height: 1.1 !important;
+  }
+
+  .home-screen .google-home:not(.reader-home):not(.review-home):not(.processing-home) .google-home-main {
+    display: grid !important;
+    grid-template-columns: minmax(250px, .36fr) minmax(480px, .64fr) !important;
+    grid-template-rows: minmax(0, 1fr) !important;
+    gap: clamp(26px, 5vw, 64px) !important;
+    align-items: center !important;
+    justify-content: center !important;
+    padding: 4px clamp(30px, 5vw, 60px) max(8px, env(safe-area-inset-bottom)) !important;
+    height: 100% !important;
+    overflow: hidden !important;
+  }
+
+  .home-screen .home-intro-panel {
+    display: block !important;
+    grid-column: 1 !important;
+    grid-row: 1 !important;
+    align-self: center !important;
+    justify-self: stretch !important;
+    transform: none !important;
+    padding: 0 !important;
+  }
+
+  .home-screen .home-badge {
+    position: static !important;
+    justify-self: start !important;
+    margin: 0 0 10px !important;
+    padding: 5px 11px !important;
+    font-size: clamp(.72rem, 1.5vw, .9rem) !important;
+  }
+
+  .home-screen .home-intro-panel h1 {
+    max-width: 15ch !important;
+    font-size: clamp(1.45rem, 3.4vw, 2.15rem) !important;
+    line-height: 1.08 !important;
+    letter-spacing: 0 !important;
+    margin: 0 !important;
+    transform: none !important;
+  }
+
+  .home-screen .home-intro-panel p {
+    max-width: 32ch !important;
+    font-size: clamp(.78rem, 1.65vw, .98rem) !important;
+    line-height: 1.25 !important;
+    margin: 10px 0 0 !important;
+    transform: none !important;
+  }
+
+  .home-screen .home-actions-panel {
+    grid-column: 2 !important;
+    grid-row: 1 !important;
+    width: 100% !important;
+    max-width: 720px !important;
+    justify-self: stretch !important;
+    align-self: center !important;
+    display: grid !important;
+    grid-template-rows: repeat(2, minmax(76px, auto)) !important;
+    gap: clamp(8px, 2vh, 14px) !important;
+    padding: 0 !important;
+    transform: none !important;
+  }
+
+  .home-screen .home-option-card {
+    width: 100% !important;
+    min-height: clamp(76px, 16vh, 104px) !important;
+    grid-template-columns: clamp(42px, 5vw, 62px) minmax(0, 1fr) clamp(28px, 3.8vw, 36px) !important;
+    gap: clamp(12px, 2.2vw, 18px) !important;
+    padding: clamp(10px, 2vh, 16px) !important;
+  }
+
+  .home-screen .home-option-icon {
+    width: clamp(42px, 5vw, 62px) !important;
+    height: clamp(42px, 5vw, 62px) !important;
+    min-width: clamp(42px, 5vw, 62px) !important;
+  }
+
+  .home-screen .home-option-text strong {
+    font-size: clamp(1rem, 2.35vw, 1.42rem) !important;
+    line-height: 1.1 !important;
+  }
+
+  .home-screen .home-option-text span {
+    font-size: clamp(.74rem, 1.75vw, .98rem) !important;
+    line-height: 1.22 !important;
+  }
+
+  .home-screen .home-recent-card,
+  .home-screen .home-safety-card {
+    display: none !important;
+  }
+
+  .home-screen .review-home .google-home-main,
+  .home-screen .processing-home .google-home-main {
+    display: grid !important;
+    grid-template-columns: minmax(0, 1fr) !important;
+    grid-template-rows: minmax(0, 1fr) !important;
+    place-items: stretch center !important;
+    padding: 10px clamp(28px, 5vw, 56px) max(12px, env(safe-area-inset-bottom)) !important;
+  }
+
+  .home-screen .review-home .speech-intro-panel,
+  .home-screen .review-home .review-intro-panel {
+    display: none !important;
+  }
+
+  .home-screen .review-home .review-panel {
+    width: min(100%, 1080px) !important;
+    max-width: 1080px !important;
+    height: 100% !important;
+    grid-template-rows: minmax(0, 1fr) clamp(42px, 9vh, 56px) !important;
+    gap: 10px !important;
+    justify-self: center !important;
+    align-self: stretch !important;
+  }
+}
+
+/* ===== HARD RESET TABLET LANDSCAPE =====
+   Cobre tablets cujo viewport util fica abaixo de 900px. Esta regra
+   neutraliza os transforms/positions antigos que empurravam o conteudo
+   para fora da esquerda. */
+@media (orientation: landscape) and (min-width: 700px) {
+  .home-screen .google-home {
+    position: relative !important;
+    width: 100vw !important;
+    max-width: 100vw !important;
+    height: 100dvh !important;
+    min-height: 100dvh !important;
+    margin: 0 !important;
+    border: 0 !important;
+    border-radius: 0 !important;
+    display: grid !important;
+    grid-template-rows: auto minmax(0, 1fr) auto !important;
+    overflow: hidden !important;
+    background: #fff !important;
+  }
+
+  .home-screen .google-home-header {
+    position: relative !important;
+    width: 100% !important;
+    min-height: 0 !important;
+    display: flex !important;
+    align-items: flex-start !important;
+    justify-content: space-between !important;
+    padding: max(8px, env(safe-area-inset-top)) clamp(22px, 4vw, 42px) 4px !important;
+    transform: none !important;
+  }
+
+  .home-screen .home-brand {
+    display: flex !important;
+    align-items: center !important;
+    gap: 10px !important;
+    position: static !important;
+    transform: none !important;
+    min-width: 0 !important;
+  }
+
+  .home-screen .header-action-row {
+    position: static !important;
+    transform: none !important;
+    margin-left: auto !important;
+  }
+
+  .home-screen .home-logo-mark {
+    width: clamp(30px, 4vw, 42px) !important;
+    height: clamp(30px, 4vw, 42px) !important;
+    min-width: clamp(30px, 4vw, 42px) !important;
+  }
+
+  .home-screen .home-brand-title {
+    font-size: clamp(1.28rem, 2.8vw, 1.86rem) !important;
+    line-height: 1 !important;
+    letter-spacing: 0 !important;
+  }
+
+  .home-screen .home-brand-subtitle {
+    font-size: clamp(.7rem, 1.45vw, .88rem) !important;
+    line-height: 1.12 !important;
+  }
+
+  .home-screen .home-help-btn,
+  .home-screen .reader-header-btn {
+    position: static !important;
+    width: clamp(30px, 4vw, 40px) !important;
+    height: clamp(30px, 4vw, 40px) !important;
+    min-width: clamp(30px, 4vw, 40px) !important;
+    transform: none !important;
+  }
+
+  .home-screen .google-home:not(.reader-home):not(.review-home):not(.processing-home) .google-home-main {
+    position: relative !important;
+    width: 100% !important;
+    height: 100% !important;
+    min-height: 0 !important;
+    display: grid !important;
+    grid-template-columns: minmax(210px, .38fr) minmax(340px, .62fr) !important;
+    grid-template-rows: minmax(0, 1fr) !important;
+    column-gap: clamp(18px, 4vw, 46px) !important;
+    align-items: center !important;
+    justify-content: center !important;
+    padding: 4px clamp(22px, 4vw, 46px) max(8px, env(safe-area-inset-bottom)) !important;
+    overflow: hidden !important;
+    transform: none !important;
+  }
+
+  .home-screen .home-intro-panel,
+  .home-screen .assisted-intro-panel {
+    display: grid !important;
+    grid-column: 1 !important;
+    grid-row: 1 !important;
+    align-self: center !important;
+    justify-self: stretch !important;
+    gap: 8px !important;
+    width: 100% !important;
+    max-width: 100% !important;
+    padding: 0 !important;
+    margin: 0 !important;
+    position: static !important;
+    transform: none !important;
+  }
+
+  .home-screen .home-badge {
+    position: static !important;
+    grid-column: auto !important;
+    grid-row: auto !important;
+    justify-self: start !important;
+    margin: 0 0 4px !important;
+    padding: 5px 10px !important;
+    font-size: clamp(.66rem, 1.35vw, .84rem) !important;
+    transform: none !important;
+  }
+
+  .home-screen .home-intro-panel h1,
+  .home-screen .assisted-intro-panel h1 {
+    max-width: 14ch !important;
+    font-size: clamp(1.35rem, 3vw, 2rem) !important;
+    line-height: 1.08 !important;
+    letter-spacing: 0 !important;
+    margin: 0 !important;
+    transform: none !important;
+  }
+
+  .home-screen .home-intro-panel p,
+  .home-screen .assisted-intro-panel p {
+    max-width: 31ch !important;
+    font-size: clamp(.74rem, 1.55vw, .94rem) !important;
+    line-height: 1.25 !important;
+    margin: 0 !important;
+    transform: none !important;
+  }
+
+  .home-screen .home-actions-panel,
+  .home-screen .assisted-actions-panel {
+    grid-column: 2 !important;
+    grid-row: 1 !important;
+    display: grid !important;
+    grid-template-rows: repeat(2, minmax(72px, auto)) !important;
+    gap: clamp(8px, 2vh, 14px) !important;
+    width: 100% !important;
+    max-width: min(100%, 620px) !important;
+    justify-self: stretch !important;
+    align-self: center !important;
+    padding: 0 !important;
+    margin: 0 !important;
+    position: static !important;
+    transform: none !important;
+  }
+
+  .home-screen .home-option-card,
+  .home-screen .assisted-option-card {
+    width: 100% !important;
+    min-height: clamp(72px, 16vh, 98px) !important;
+    display: grid !important;
+    grid-template-columns: clamp(40px, 5vw, 58px) minmax(0, 1fr) clamp(26px, 3.5vw, 34px) !important;
+    gap: clamp(10px, 2vw, 16px) !important;
+    padding: clamp(10px, 2vh, 14px) !important;
+    align-items: center !important;
+    position: static !important;
+    transform: none !important;
+  }
+
+  .home-screen .home-option-icon,
+  .home-screen .assisted-option-icon {
+    width: clamp(40px, 5vw, 58px) !important;
+    height: clamp(40px, 5vw, 58px) !important;
+    min-width: clamp(40px, 5vw, 58px) !important;
+  }
+
+  .home-screen .home-option-text strong,
+  .home-screen .assisted-option-card .home-option-text strong {
+    font-size: clamp(.95rem, 2.1vw, 1.28rem) !important;
+    line-height: 1.1 !important;
+  }
+
+  .home-screen .home-option-text span,
+  .home-screen .assisted-option-card .home-option-text span {
+    font-size: clamp(.7rem, 1.55vw, .9rem) !important;
+    line-height: 1.22 !important;
+  }
+
+  .home-screen .home-recent-card,
+  .home-screen .home-safety-card {
+    display: none !important;
+  }
+}
+
+/* ===== UNIVERSAL LANDSCAPE BASELINE =====
+   Regra final: em horizontal todos os ecras usam uma grelha previsivel.
+   Neutraliza as camadas antigas que usavam absolute/fixed/translate. */
+@media (orientation: landscape) {
+  .player-app,
+  .app-shell,
+  .screen-center.home-screen {
+    width: 100vw !important;
+    max-width: 100vw !important;
+    height: 100dvh !important;
+    min-height: 100dvh !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    overflow: hidden !important;
+    background: #fff !important;
+  }
+
+  .home-screen .google-home {
+    position: relative !important;
+    width: 100vw !important;
+    max-width: 100vw !important;
+    height: 100dvh !important;
+    min-height: 100dvh !important;
+    margin: 0 !important;
+    border: 0 !important;
+    border-radius: 0 !important;
+    display: grid !important;
+    grid-template-rows: auto minmax(0, 1fr) auto !important;
+    overflow: hidden !important;
+    background: #fff !important;
+    box-shadow: none !important;
+  }
+
+  .home-screen .google-home-header {
+    position: static !important;
+    width: 100% !important;
+    min-height: 0 !important;
+    display: flex !important;
+    align-items: flex-start !important;
+    justify-content: space-between !important;
+    gap: 12px !important;
+    padding: max(8px, env(safe-area-inset-top)) clamp(16px, 4vw, 38px) 4px !important;
+    transform: none !important;
+  }
+
+  .home-screen .home-brand,
+  .home-screen .header-action-row,
+  .home-screen .reader-header-actions {
+    position: static !important;
+    display: flex !important;
+    align-items: center !important;
+    transform: none !important;
+    inset: auto !important;
+  }
+
+  .home-screen .home-brand {
+    justify-self: start !important;
+    min-width: 0 !important;
+    gap: 9px !important;
+  }
+
+  .home-screen .header-action-row,
+  .home-screen .reader-header-actions {
+    justify-content: flex-end !important;
+    margin-left: auto !important;
+  }
+
+  .home-screen .home-logo-mark {
+    width: clamp(26px, 4.2vw, 42px) !important;
+    height: clamp(26px, 4.2vw, 42px) !important;
+    min-width: clamp(26px, 4.2vw, 42px) !important;
+    transform: none !important;
+  }
+
+  .home-screen .home-brand-title {
+    font-size: clamp(1.15rem, 3vw, 1.85rem) !important;
+    line-height: 1 !important;
+    letter-spacing: 0 !important;
+    transform: none !important;
+  }
+
+  .home-screen .home-brand-subtitle {
+    font-size: clamp(.62rem, 1.6vw, .88rem) !important;
+    line-height: 1.1 !important;
+    transform: none !important;
+  }
+
+  .home-screen .home-help-btn,
+  .home-screen .reader-header-btn {
+    position: static !important;
+    width: clamp(26px, 4vw, 38px) !important;
+    height: clamp(26px, 4vw, 38px) !important;
+    min-width: clamp(26px, 4vw, 38px) !important;
+    transform: none !important;
+  }
+
+  .home-screen .google-home:not(.reader-home):not(.review-home):not(.processing-home) .google-home-main {
+    position: static !important;
+    width: 100% !important;
+    height: 100% !important;
+    min-height: 0 !important;
+    display: grid !important;
+    grid-template-columns: minmax(0, .38fr) minmax(0, .62fr) !important;
+    grid-template-rows: minmax(0, 1fr) !important;
+    column-gap: clamp(12px, 4vw, 44px) !important;
+    align-items: center !important;
+    justify-content: center !important;
+    padding: 4px clamp(12px, 4vw, 42px) max(8px, env(safe-area-inset-bottom)) !important;
+    overflow: hidden !important;
+    transform: none !important;
+  }
+
+  .home-screen .home-intro-panel,
+  .home-screen .assisted-intro-panel,
+  .home-screen .speech-intro-panel {
+    position: static !important;
+    display: grid !important;
+    grid-column: 1 !important;
+    grid-row: 1 !important;
+    align-self: center !important;
+    justify-self: stretch !important;
+    width: 100% !important;
+    max-width: 100% !important;
+    min-width: 0 !important;
+    gap: clamp(5px, 1.6vh, 10px) !important;
+    padding: 0 !important;
+    margin: 0 !important;
+    transform: none !important;
+    pointer-events: auto !important;
+  }
+
+  .home-screen .home-badge {
+    position: static !important;
+    grid-column: auto !important;
+    grid-row: auto !important;
+    justify-self: start !important;
+    margin: 0 0 2px !important;
+    padding: 4px 9px !important;
+    font-size: clamp(.58rem, 1.6vw, .82rem) !important;
+    line-height: 1 !important;
+    transform: none !important;
+  }
+
+  .home-screen .home-intro-panel h1,
+  .home-screen .assisted-intro-panel h1,
+  .home-screen .speech-intro-panel h1 {
+    max-width: 14ch !important;
+    font-size: clamp(1.08rem, 3.8vw, 2rem) !important;
+    line-height: 1.08 !important;
+    letter-spacing: 0 !important;
+    margin: 0 !important;
+    transform: none !important;
+    white-space: normal !important;
+  }
+
+  .home-screen .home-intro-panel p,
+  .home-screen .assisted-intro-panel p,
+  .home-screen .speech-intro-panel p {
+    max-width: 31ch !important;
+    font-size: clamp(.62rem, 1.8vw, .92rem) !important;
+    line-height: 1.24 !important;
+    margin: 0 !important;
+    transform: none !important;
+    white-space: normal !important;
+  }
+
+  .home-screen .home-actions-panel,
+  .home-screen .assisted-actions-panel {
+    position: static !important;
+    grid-column: 2 !important;
+    grid-row: 1 !important;
+    display: grid !important;
+    grid-template-rows: repeat(2, minmax(56px, auto)) !important;
+    gap: clamp(6px, 2vh, 12px) !important;
+    width: 100% !important;
+    max-width: min(100%, 680px) !important;
+    justify-self: stretch !important;
+    align-self: center !important;
+    padding: 0 !important;
+    margin: 0 !important;
+    transform: none !important;
+  }
+
+  .home-screen .home-option-card,
+  .home-screen .assisted-option-card {
+    position: static !important;
+    width: 100% !important;
+    min-width: 0 !important;
+    min-height: clamp(56px, 18vh, 102px) !important;
+    max-height: none !important;
+    display: grid !important;
+    grid-template-columns: clamp(34px, 6vw, 58px) minmax(0, 1fr) clamp(24px, 4vw, 34px) !important;
+    gap: clamp(8px, 2vw, 14px) !important;
+    padding: clamp(8px, 2vh, 14px) !important;
+    align-items: center !important;
+    transform: none !important;
+  }
+
+  .home-screen .home-option-icon,
+  .home-screen .assisted-option-icon {
+    width: clamp(34px, 6vw, 58px) !important;
+    height: clamp(34px, 6vw, 58px) !important;
+    min-width: clamp(34px, 6vw, 58px) !important;
+  }
+
+  .home-screen .home-option-arrow {
+    width: clamp(24px, 4vw, 34px) !important;
+    height: clamp(24px, 4vw, 34px) !important;
+    min-width: clamp(24px, 4vw, 34px) !important;
+  }
+
+  .home-screen .home-option-text strong,
+  .home-screen .assisted-option-card .home-option-text strong {
+    font-size: clamp(.82rem, 2.5vw, 1.28rem) !important;
+    line-height: 1.1 !important;
+    letter-spacing: 0 !important;
+  }
+
+  .home-screen .home-option-text span,
+  .home-screen .assisted-option-card .home-option-text span {
+    font-size: clamp(.58rem, 1.75vw, .9rem) !important;
+    line-height: 1.2 !important;
+  }
+
+  .home-screen .home-recent-card,
+  .home-screen .home-safety-card {
+    display: none !important;
+  }
+
+  .home-screen .review-home .google-home-main,
+  .home-screen .processing-home .google-home-main {
+    position: static !important;
+    display: grid !important;
+    grid-template-columns: minmax(0, 1fr) !important;
+    grid-template-rows: minmax(0, 1fr) !important;
+    place-items: stretch center !important;
+    padding: 6px clamp(12px, 4vw, 42px) max(8px, env(safe-area-inset-bottom)) !important;
+    overflow: hidden !important;
+  }
+
+  .home-screen .review-home .speech-intro-panel,
+  .home-screen .review-home .review-intro-panel {
+    display: none !important;
+  }
+
+  .home-screen .review-home .review-panel {
+    position: static !important;
+    width: min(100%, 1080px) !important;
+    max-width: 1080px !important;
+    height: 100% !important;
+    min-height: 0 !important;
+    display: grid !important;
+    grid-template-rows: minmax(0, 1fr) clamp(34px, 9vh, 54px) !important;
+    gap: 8px !important;
+    justify-self: center !important;
+    align-self: stretch !important;
+    overflow: hidden !important;
+    transform: none !important;
+  }
+
+  .home-screen .review-home .review-preview-card {
+    width: 100% !important;
+    height: 100% !important;
+    min-height: 0 !important;
+    padding: 8px !important;
+    display: grid !important;
+    place-items: center !important;
+    overflow: hidden !important;
+    transform: none !important;
+  }
+
+  .home-screen .review-home .preview-image {
+    width: 100% !important;
+    height: 100% !important;
+    max-height: 100% !important;
+    object-fit: contain !important;
+  }
+
+  .home-screen .review-home .image-confirm-controls {
+    min-height: clamp(34px, 9vh, 54px) !important;
+    display: grid !important;
+    grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+    gap: 8px !important;
+    padding: 0 !important;
+    transform: none !important;
+  }
+}
+
+/* ===== LANDSCAPE HARD RESET =====
+   Esta regra fica no fim de App.vue de proposito: neutraliza o CSS antigo
+   que ainda centrava/recortava o #app e puxava os paineis para fora do ecra. */
+@media (orientation: landscape) {
+  html,
+  body,
+  #app {
+    width: 100vw !important;
+    max-width: 100vw !important;
+    min-width: 0 !important;
+    height: 100dvh !important;
+    min-height: 100dvh !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    border: 0 !important;
+    overflow: hidden !important;
+    text-align: initial !important;
+  }
+
+  #app {
+    display: block !important;
+  }
+
+  body #app .player-app,
+  body #app .app-shell,
+  body #app .screen-center.home-screen,
+  body #app .screen-center.home-screen > .google-home {
+    position: relative !important;
+    inset: auto !important;
+    left: auto !important;
+    right: auto !important;
+    top: auto !important;
+    bottom: auto !important;
+    width: 100vw !important;
+    max-width: 100vw !important;
+    min-width: 0 !important;
+    height: 100dvh !important;
+    min-height: 100dvh !important;
+    max-height: 100dvh !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    border: 0 !important;
+    border-radius: 0 !important;
+    box-shadow: none !important;
+    overflow: hidden !important;
+    transform: none !important;
+    translate: none !important;
+  }
+
+  body #app .player-app {
+    position: fixed !important;
+    inset: 0 !important;
+    left: 0 !important;
+    top: 0 !important;
+    right: 0 !important;
+    bottom: 0 !important;
+  }
+
+  body #app .screen-center.home-screen {
+    display: block !important;
+    place-items: initial !important;
+  }
+
+  body #app .screen-center.home-screen > .google-home {
+    display: grid !important;
+    grid-template-rows: auto minmax(0, 1fr) auto !important;
+    background: #fff !important;
+  }
+
+  body #app .screen-center.home-screen .google-home-header {
+    position: relative !important;
+    inset: auto !important;
+    width: 100% !important;
+    max-width: 100% !important;
+    min-height: 0 !important;
+    display: flex !important;
+    align-items: flex-start !important;
+    justify-content: space-between !important;
+    gap: clamp(8px, 2vw, 14px) !important;
+    padding: max(8px, env(safe-area-inset-top)) clamp(18px, 4vw, 42px) 4px !important;
+    overflow: visible !important;
+    transform: none !important;
+    translate: none !important;
+  }
+
+  body #app .screen-center.home-screen .home-brand {
+    position: relative !important;
+    inset: auto !important;
+    display: flex !important;
+    align-items: center !important;
+    gap: clamp(8px, 1.8vw, 12px) !important;
+    min-width: 0 !important;
+    opacity: 1 !important;
+    visibility: visible !important;
+    transform: none !important;
+    translate: none !important;
+  }
+
+  body #app .screen-center.home-screen .home-logo-mark {
+    position: relative !important;
+    flex: 0 0 auto !important;
+    width: clamp(28px, 5.4vh, 42px) !important;
+    min-width: clamp(28px, 5.4vh, 42px) !important;
+    height: clamp(28px, 5.4vh, 42px) !important;
+    opacity: 1 !important;
+    visibility: visible !important;
+  }
+
+  body #app .screen-center.home-screen .home-brand-title {
+    font-size: clamp(1.25rem, 4.7vh, 1.9rem) !important;
+    line-height: 1 !important;
+    letter-spacing: 0 !important;
+    font-weight: 800 !important;
+    opacity: 1 !important;
+    visibility: visible !important;
+  }
+
+  body #app .screen-center.home-screen .home-brand-subtitle {
+    margin-top: 2px !important;
+    font-size: clamp(.66rem, 2.2vh, .9rem) !important;
+    line-height: 1.1 !important;
+    opacity: 1 !important;
+    visibility: visible !important;
+  }
+
+  body #app .screen-center.home-screen .header-action-row,
+  body #app .screen-center.home-screen .reader-header-actions {
+    position: relative !important;
+    inset: auto !important;
+    display: flex !important;
+    align-items: center !important;
+    justify-content: flex-end !important;
+    margin-left: auto !important;
+    transform: none !important;
+    translate: none !important;
+  }
+
+  body #app .screen-center.home-screen .home-help-btn,
+  body #app .screen-center.home-screen .reader-header-btn {
+    position: relative !important;
+    inset: auto !important;
+    width: clamp(30px, 5.2vh, 38px) !important;
+    min-width: clamp(30px, 5.2vh, 38px) !important;
+    height: clamp(30px, 5.2vh, 38px) !important;
+    padding: 6px !important;
+    transform: none !important;
+    translate: none !important;
+  }
+
+  body #app .screen-center.home-screen .google-home:not(.reader-home):not(.review-home):not(.processing-home) .google-home-main {
+    position: relative !important;
+    inset: auto !important;
+    width: 100% !important;
+    max-width: 100% !important;
+    min-width: 0 !important;
+    height: 100% !important;
+    min-height: 0 !important;
+    max-height: 100% !important;
+    display: grid !important;
+    grid-template-columns: minmax(0, .38fr) minmax(0, .62fr) !important;
+    grid-template-rows: minmax(0, 1fr) !important;
+    column-gap: clamp(16px, 4vw, 54px) !important;
+    align-items: center !important;
+    justify-content: center !important;
+    padding: 4px clamp(18px, 4vw, 46px) max(8px, env(safe-area-inset-bottom)) !important;
+    overflow: hidden !important;
+    transform: none !important;
+    translate: none !important;
+  }
+
+  body #app .screen-center.home-screen .google-home:not(.reader-home):not(.review-home):not(.processing-home) .home-intro-panel {
+    position: relative !important;
+    inset: auto !important;
+    grid-column: 1 !important;
+    grid-row: 1 !important;
+    align-self: center !important;
+    justify-self: stretch !important;
+    display: grid !important;
+    gap: clamp(5px, 1.5vh, 10px) !important;
+    width: 100% !important;
+    max-width: 100% !important;
+    min-width: 0 !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    overflow: visible !important;
+    opacity: 1 !important;
+    visibility: visible !important;
+    transform: none !important;
+    translate: none !important;
+  }
+
+  body #app .screen-center.home-screen .google-home:not(.reader-home):not(.review-home):not(.processing-home) .home-intro-panel h1 {
+    max-width: 14ch !important;
+    margin: 0 !important;
+    font-size: clamp(1.15rem, 5.5vh, 2.15rem) !important;
+    line-height: 1.08 !important;
+    letter-spacing: 0 !important;
+    white-space: normal !important;
+    transform: none !important;
+  }
+
+  body #app .screen-center.home-screen .google-home:not(.reader-home):not(.review-home):not(.processing-home) .home-intro-panel p {
+    max-width: 32ch !important;
+    margin: 0 !important;
+    font-size: clamp(.64rem, 2.45vh, .96rem) !important;
+    line-height: 1.26 !important;
+    white-space: normal !important;
+    transform: none !important;
+  }
+
+  body #app .screen-center.home-screen .home-badge {
+    position: relative !important;
+    inset: auto !important;
+    justify-self: start !important;
+    max-width: 100% !important;
+    margin: 0 0 2px !important;
+    padding: 4px 10px !important;
+    font-size: clamp(.6rem, 2.2vh, .82rem) !important;
+    line-height: 1 !important;
+    transform: none !important;
+    translate: none !important;
+  }
+
+  body #app .screen-center.home-screen .home-actions-panel,
+  body #app .screen-center.home-screen .assisted-actions-panel {
+    position: relative !important;
+    inset: auto !important;
+    grid-column: 2 !important;
+    grid-row: 1 !important;
+    align-self: center !important;
+    justify-self: stretch !important;
+    display: grid !important;
+    grid-template-rows: repeat(2, minmax(58px, auto)) !important;
+    gap: clamp(7px, 2vh, 13px) !important;
+    width: 100% !important;
+    max-width: min(100%, 720px) !important;
+    min-width: 0 !important;
+    height: auto !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    overflow: visible !important;
+    transform: none !important;
+    translate: none !important;
+  }
+
+  body #app .screen-center.home-screen .home-option-card,
+  body #app .screen-center.home-screen .assisted-option-card {
+    position: relative !important;
+    inset: auto !important;
+    width: 100% !important;
+    max-width: 100% !important;
+    min-width: 0 !important;
+    min-height: clamp(58px, 18vh, 104px) !important;
+    display: grid !important;
+    grid-template-columns: clamp(34px, 7vh, 58px) minmax(0, 1fr) clamp(24px, 5vh, 34px) !important;
+    align-items: center !important;
+    gap: clamp(8px, 2vw, 14px) !important;
+    padding: clamp(8px, 2vh, 14px) !important;
+    overflow: hidden !important;
+    transform: none !important;
+    translate: none !important;
+  }
+
+  body #app .screen-center.home-screen .home-option-icon,
+  body #app .screen-center.home-screen .assisted-option-icon {
+    width: clamp(34px, 7vh, 58px) !important;
+    min-width: clamp(34px, 7vh, 58px) !important;
+    height: clamp(34px, 7vh, 58px) !important;
+  }
+
+  body #app .screen-center.home-screen .home-option-text {
+    min-width: 0 !important;
+    text-align: left !important;
+  }
+
+  body #app .screen-center.home-screen .home-option-text strong {
+    font-size: clamp(.84rem, 3.3vh, 1.3rem) !important;
+    line-height: 1.1 !important;
+    letter-spacing: 0 !important;
+  }
+
+  body #app .screen-center.home-screen .home-option-text span {
+    font-size: clamp(.58rem, 2.25vh, .9rem) !important;
+    line-height: 1.22 !important;
+  }
+
+  body #app .screen-center.home-screen .home-option-arrow {
+    display: grid !important;
+    place-items: center !important;
+    width: clamp(24px, 5vh, 34px) !important;
+    min-width: clamp(24px, 5vh, 34px) !important;
+    height: clamp(24px, 5vh, 34px) !important;
+  }
+
+  body #app .screen-center.home-screen .home-recent-card,
+  body #app .screen-center.home-screen .home-safety-card {
+    display: none !important;
+  }
+
+  body #app .screen-center.home-screen .review-home .google-home-main,
+  body #app .screen-center.home-screen .processing-home .google-home-main {
+    position: relative !important;
+    inset: auto !important;
+    display: grid !important;
+    grid-template-columns: minmax(0, 1fr) !important;
+    grid-template-rows: minmax(0, 1fr) !important;
+    place-items: stretch center !important;
+    width: 100% !important;
+    height: 100% !important;
+    min-height: 0 !important;
+    padding: 6px clamp(18px, 4vw, 46px) max(8px, env(safe-area-inset-bottom)) !important;
+    overflow: hidden !important;
+    transform: none !important;
+    translate: none !important;
+  }
+
+  body #app .screen-center.home-screen .review-home .speech-intro-panel,
+  body #app .screen-center.home-screen .review-home .review-intro-panel {
+    display: none !important;
+  }
+
+  body #app .screen-center.home-screen .review-home .review-panel {
+    position: relative !important;
+    inset: auto !important;
+    display: grid !important;
+    grid-template-rows: minmax(0, 1fr) clamp(36px, 9vh, 54px) !important;
+    gap: 8px !important;
+    align-self: stretch !important;
+    justify-self: center !important;
+    width: min(100%, 1080px) !important;
+    max-width: 1080px !important;
+    height: 100% !important;
+    min-height: 0 !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    overflow: hidden !important;
+    transform: none !important;
+    translate: none !important;
+  }
+
+  body #app .screen-center.home-screen .review-home .review-preview-card {
+    width: 100% !important;
+    height: 100% !important;
+    min-height: 0 !important;
+    padding: 8px !important;
+    display: grid !important;
+    place-items: center !important;
+    overflow: hidden !important;
+    transform: none !important;
+  }
+
+  body #app .screen-center.home-screen .review-home .preview-image {
+    width: 100% !important;
+    height: 100% !important;
+    max-height: 100% !important;
+    object-fit: contain !important;
+  }
+
+  body #app .screen-center.home-screen .review-home .image-confirm-controls {
+    display: grid !important;
+    grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+    gap: 8px !important;
+    min-height: clamp(36px, 9vh, 54px) !important;
+    padding: 0 !important;
+    transform: none !important;
+  }
+
+  body #app .screen-center.home-screen .google-home:not(.reader-home):not(.review-home):not(.processing-home) .google-home-header {
+    position: fixed !important;
+    z-index: 20 !important;
+    inset: 0 0 auto 0 !important;
+    width: 100vw !important;
+    max-width: 100vw !important;
+    padding: max(8px, env(safe-area-inset-top)) clamp(18px, 4vw, 42px) 4px !important;
+  }
+
+  body #app .screen-center.home-screen .google-home:not(.reader-home):not(.review-home):not(.processing-home) .home-brand {
+    position: fixed !important;
+    z-index: 21 !important;
+    left: clamp(18px, 4vw, 42px) !important;
+    top: max(8px, env(safe-area-inset-top)) !important;
+  }
+
+  body #app .screen-center.home-screen .google-home:not(.reader-home):not(.review-home):not(.processing-home) .header-action-row {
+    position: fixed !important;
+    z-index: 21 !important;
+    right: clamp(18px, 4vw, 42px) !important;
+    top: max(8px, env(safe-area-inset-top)) !important;
+    margin-left: 0 !important;
+  }
+
+  body #app .screen-center.home-screen .google-home:not(.reader-home):not(.review-home):not(.processing-home) .google-home-main {
+    display: block !important;
+    padding: 0 !important;
+  }
+
+  body #app .screen-center.home-screen .google-home:not(.reader-home):not(.review-home):not(.processing-home) .home-intro-panel,
+  body #app .screen-center.home-screen .google-home:not(.reader-home):not(.review-home):not(.processing-home) .assisted-intro-panel {
+    position: fixed !important;
+    z-index: 10 !important;
+    left: clamp(22px, 5vw, 58px) !important;
+    top: clamp(86px, 30vh, 170px) !important;
+    width: min(34vw, 360px) !important;
+    max-width: min(34vw, 360px) !important;
+    display: grid !important;
+    gap: clamp(6px, 1.5vh, 10px) !important;
+  }
+
+  body #app .screen-center.home-screen .google-home:not(.reader-home):not(.review-home):not(.processing-home) .home-actions-panel,
+  body #app .screen-center.home-screen .google-home:not(.reader-home):not(.review-home):not(.processing-home) .assisted-actions-panel {
+    position: fixed !important;
+    z-index: 10 !important;
+    right: clamp(28px, 5vw, 64px) !important;
+    top: clamp(112px, 31vh, 190px) !important;
+    width: min(62vw, 720px) !important;
+    max-width: min(62vw, 720px) !important;
+    display: grid !important;
+    grid-template-rows: repeat(2, minmax(62px, auto)) !important;
+    gap: clamp(8px, 2vh, 14px) !important;
+  }
+
+  body #app .screen-center.home-screen .google-home:not(.reader-home):not(.review-home):not(.processing-home) .home-option-card,
+  body #app .screen-center.home-screen .google-home:not(.reader-home):not(.review-home):not(.processing-home) .assisted-option-card {
+    min-height: clamp(62px, 18vh, 108px) !important;
+  }
+
+  body #app .screen-center.home-screen .review-home .google-home-header {
+    position: fixed !important;
+    z-index: 20 !important;
+    inset: 0 0 auto 0 !important;
+    width: 100vw !important;
+    padding: max(8px, env(safe-area-inset-top)) clamp(18px, 4vw, 42px) 4px !important;
+  }
+
+  body #app .screen-center.home-screen .review-home .home-brand {
+    position: fixed !important;
+    z-index: 21 !important;
+    left: clamp(18px, 4vw, 42px) !important;
+    top: max(8px, env(safe-area-inset-top)) !important;
+  }
+
+  body #app .screen-center.home-screen .review-home .header-action-row {
+    position: fixed !important;
+    z-index: 21 !important;
+    right: clamp(18px, 4vw, 42px) !important;
+    top: max(8px, env(safe-area-inset-top)) !important;
+    margin-left: 0 !important;
+  }
+
+  body #app .screen-center.home-screen .review-home .review-panel {
+    position: fixed !important;
+    left: clamp(28px, 4vw, 48px) !important;
+    right: clamp(28px, 4vw, 48px) !important;
+    top: clamp(74px, 15vh, 120px) !important;
+    bottom: max(8px, env(safe-area-inset-bottom)) !important;
+    width: auto !important;
+    min-width: calc(100vw - clamp(56px, 8vw, 96px)) !important;
+    max-width: none !important;
+    height: auto !important;
+  }
+
+  body #app .screen-center.home-screen .review-home .review-preview-card,
+  body #app .screen-center.home-screen .review-home .image-confirm-controls {
+    width: 100% !important;
+    max-width: none !important;
+  }
+}
+
+.app-entry-view,
+.app-entry-view * {
+  box-sizing: border-box;
+}
+
+.player-app.is-entry-screen,
+.player-app.is-entry-screen .app-shell {
+  position: fixed !important;
+  inset: 0 !important;
+  left: 0 !important;
+  top: 0 !important;
+  right: 0 !important;
+  bottom: 0 !important;
+  display: block !important;
+  width: 100vw !important;
+  max-width: none !important;
+  min-width: 100vw !important;
+  height: 100dvh !important;
+  min-height: 100dvh !important;
+  max-height: 100dvh !important;
+  margin: 0 !important;
+  padding: 0 !important;
+  overflow: hidden !important;
+  background: #fff !important;
+  transform: none !important;
+  translate: none !important;
+}
+
+.player-app.is-app-screen,
+.player-app.is-app-screen .app-shell {
+  position: fixed !important;
+  inset: 0 !important;
+  left: 0 !important;
+  top: 0 !important;
+  right: 0 !important;
+  bottom: 0 !important;
+  display: block !important;
+  width: 100vw !important;
+  max-width: none !important;
+  min-width: 100vw !important;
+  height: 100dvh !important;
+  min-height: 100dvh !important;
+  max-height: 100dvh !important;
+  margin: 0 !important;
+  padding: 0 !important;
+  overflow: hidden !important;
+  background: #fff !important;
+  transform: none !important;
+  translate: none !important;
+}
+
+.player-app.is-app-screen .screen-center.home-screen,
+.player-app.is-app-screen .screen-center.home-screen > .google-home {
+  position: absolute !important;
+  inset: 0 !important;
+  left: 0 !important;
+  top: 0 !important;
+  right: 0 !important;
+  bottom: 0 !important;
+  display: block !important;
+  width: 100vw !important;
+  max-width: none !important;
+  min-width: 100vw !important;
+  height: 100dvh !important;
+  min-height: 100dvh !important;
+  max-height: 100dvh !important;
+  margin: 0 !important;
+  padding: 0 !important;
+  border: 0 !important;
+  border-radius: 0 !important;
+  box-shadow: none !important;
+  overflow: hidden !important;
+  background: #fff !important;
+  transform: none !important;
+  translate: none !important;
+}
+
+.player-app.is-app-screen .screen-center.home-screen > .google-home {
+  display: grid !important;
+  grid-template-rows: auto minmax(0, 1fr) auto !important;
+}
+
+.player-app.is-app-screen .google-home-header {
+  position: relative !important;
+  z-index: 2 !important;
+  display: flex !important;
+  width: 100% !important;
+  min-height: 0 !important;
+  padding: max(12px, env(safe-area-inset-top)) max(22px, env(safe-area-inset-right)) 6px max(22px, env(safe-area-inset-left)) !important;
+  transform: none !important;
+}
+
+.player-app.is-app-screen .home-brand,
+.player-app.is-app-screen .header-action-row,
+.player-app.is-app-screen .reader-header-actions {
+  position: static !important;
+  transform: none !important;
+  translate: none !important;
+}
+
+.player-app.is-app-screen .home-logo-mark {
+  width: clamp(28px, 4.6vh, 42px) !important;
+  height: clamp(28px, 4.6vh, 42px) !important;
+  min-width: clamp(28px, 4.6vh, 42px) !important;
+}
+
+.player-app.is-app-screen .home-brand-title {
+  font-size: clamp(20px, 3.1vh, 30px) !important;
+  line-height: 1 !important;
+  letter-spacing: 0 !important;
+}
+
+.player-app.is-app-screen .home-brand-subtitle {
+  font-size: clamp(10px, 1.8vh, 14px) !important;
+  line-height: 1.15 !important;
+}
+
+.player-app.is-app-screen .google-home-main {
+  position: relative !important;
+  min-width: 0 !important;
+  min-height: 0 !important;
+  width: 100% !important;
+  height: 100% !important;
+  overflow: hidden !important;
+  transform: none !important;
+  translate: none !important;
+}
+
+@media (orientation: portrait) {
+  .player-app.is-app-screen .google-home-main {
+    padding: 8px max(18px, env(safe-area-inset-right)) max(10px, env(safe-area-inset-bottom)) max(18px, env(safe-area-inset-left)) !important;
+  }
+}
+
+@media (orientation: landscape) {
+  .player-app.is-app-screen .google-home-header {
+    padding: max(8px, env(safe-area-inset-top)) max(clamp(22px, 4vw, 52px), env(safe-area-inset-right)) 4px max(clamp(22px, 4vw, 52px), env(safe-area-inset-left)) !important;
+  }
+
+  .player-app.is-app-screen .google-home-main {
+    padding: 4px max(clamp(22px, 4vw, 56px), env(safe-area-inset-right)) max(8px, env(safe-area-inset-bottom)) max(clamp(22px, 4vw, 56px), env(safe-area-inset-left)) !important;
+  }
+
+  .player-app.is-app-screen .assisted-home .google-home-main {
+    display: grid !important;
+    grid-template-columns: minmax(180px, 360px) minmax(340px, 690px) !important;
+    grid-template-rows: minmax(0, 1fr) !important;
+    align-items: center !important;
+    justify-content: center !important;
+    gap: clamp(22px, 7vw, 92px) !important;
+  }
+
+  .player-app.is-app-screen .assisted-intro-panel {
+    position: static !important;
+    grid-column: 1 !important;
+    align-self: center !important;
+    justify-self: stretch !important;
+    width: 100% !important;
+    max-width: 100% !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    transform: none !important;
+  }
+
+  .player-app.is-app-screen .assisted-actions-panel {
+    position: static !important;
+    grid-column: 2 !important;
+    display: grid !important;
+    grid-template-rows: repeat(2, minmax(54px, auto)) !important;
+    gap: clamp(8px, 2.2vh, 14px) !important;
+    width: 100% !important;
+    max-width: none !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    transform: none !important;
+  }
+
+  .player-app.is-app-screen .assisted-intro-panel h1 {
+    max-width: 15ch !important;
+    margin: 0 !important;
+    font-size: clamp(18px, 4vh, 30px) !important;
+    line-height: 1.08 !important;
+    letter-spacing: 0 !important;
+  }
+
+  .player-app.is-app-screen .assisted-intro-panel p {
+    max-width: 32ch !important;
+    margin: 8px 0 0 !important;
+    font-size: clamp(10px, 1.9vh, 14px) !important;
+    line-height: 1.25 !important;
+  }
+
+  .player-app.is-app-screen .assisted-option-card {
+    width: 100% !important;
+    min-height: clamp(54px, 12vh, 78px) !important;
+    display: grid !important;
+    grid-template-columns: clamp(42px, 8vh, 62px) minmax(0, 1fr) clamp(28px, 5vh, 34px) !important;
+    gap: clamp(10px, 2vw, 16px) !important;
+    padding: clamp(8px, 1.8vh, 13px) !important;
+    border-radius: 14px !important;
+    transform: none !important;
+  }
+
+  .player-app.is-app-screen .assisted-option-icon {
+    width: clamp(42px, 8vh, 62px) !important;
+    height: clamp(42px, 8vh, 62px) !important;
+    min-width: clamp(42px, 8vh, 62px) !important;
+  }
+
+  .player-app.is-app-screen .home-option-text strong {
+    font-size: clamp(13px, 2.35vh, 18px) !important;
+    line-height: 1.1 !important;
+    letter-spacing: 0 !important;
+  }
+
+  .player-app.is-app-screen .home-option-text span {
+    font-size: clamp(9px, 1.65vh, 13px) !important;
+    line-height: 1.2 !important;
+  }
+
+  .player-app.is-app-screen .speech-home .google-home-main {
+    display: grid !important;
+    grid-template-columns: minmax(180px, 340px) minmax(420px, 760px) !important;
+    grid-template-rows: minmax(0, 1fr) !important;
+    align-items: center !important;
+    justify-content: center !important;
+    gap: clamp(20px, 6vw, 78px) !important;
+  }
+
+  .player-app.is-app-screen .speech-intro-panel {
+    position: static !important;
+    grid-column: 1 !important;
+    align-self: center !important;
+    justify-self: stretch !important;
+    width: 100% !important;
+    max-width: 100% !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    transform: none !important;
+  }
+
+  .player-app.is-app-screen .speech-intro-panel h1 {
+    margin: 0 !important;
+    font-size: clamp(17px, 3.7vh, 28px) !important;
+    line-height: 1.08 !important;
+    letter-spacing: 0 !important;
+  }
+
+  .player-app.is-app-screen .speech-intro-panel p {
+    margin: 8px 0 0 !important;
+    font-size: clamp(10px, 1.75vh, 13px) !important;
+    line-height: 1.25 !important;
+  }
+
+  .player-app.is-app-screen .speech-work-panel {
+    grid-column: 2 !important;
+    align-self: center !important;
+    width: 100% !important;
+    max-width: none !important;
+    min-height: 0 !important;
+    margin: 0 !important;
+    transform: none !important;
+  }
+}
+
+.app-entry-view {
+  position: absolute !important;
+  inset: 0 !important;
+  z-index: 9999 !important;
+  width: 100vw !important;
+  height: 100dvh !important;
+  min-height: 100dvh !important;
+  overflow: hidden !important;
+  background: #fff !important;
+  color: #172033;
+  font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+}
+
+.app-entry-header {
+  position: absolute;
+  inset: 0 0 auto;
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 14px;
+  padding: max(14px, env(safe-area-inset-top)) max(18px, env(safe-area-inset-right)) 0 max(18px, env(safe-area-inset-left));
+}
+
+.app-entry-brand {
+  display: flex;
+  align-items: center;
+  gap: clamp(8px, 1.6vw, 12px);
+  min-width: 0;
+}
+
+.app-entry-logo {
+  position: relative;
+  flex: 0 0 auto;
+  width: clamp(24px, 4.2vh, 32px);
+  height: clamp(24px, 4.2vh, 32px);
+  overflow: hidden;
+  border-radius: 12px;
+}
+
+.app-entry-logo span {
+  position: absolute;
+  display: block;
+}
+
+.app-entry-logo-blue {
+  left: 0;
+  top: 0;
+  width: 100%;
+  height: 68%;
+  background: #1a73e8;
+  border-radius: 14px 16px 7px 7px;
+}
+
+.app-entry-logo-red {
+  left: 0;
+  top: 36%;
+  width: 50%;
+  height: 28%;
+  background: #ea4335;
+}
+
+.app-entry-logo-yellow {
+  left: 0;
+  bottom: 0;
+  width: 50%;
+  height: 42%;
+  background: #fbbc04;
+}
+
+.app-entry-logo-green {
+  right: 0;
+  bottom: 0;
+  width: 58%;
+  height: 58%;
+  background: #34a853;
+}
+
+.app-entry-brand-title {
+  color: #1f64d9;
+  font-size: clamp(18px, 2.1vw, 24px);
+  font-weight: 800;
+  line-height: 1;
+  letter-spacing: 0;
+}
+
+.app-entry-brand-title span {
+  color: #1a73e8;
+}
+
+.app-entry-brand-subtitle {
+  margin-top: 4px;
+  color: #667085;
+  font-size: clamp(10px, 1vw, 12px);
+  line-height: 1.15;
+}
+
+.app-entry-home-button {
+  display: grid;
+  place-items: center;
+  width: clamp(34px, 6vh, 42px);
+  height: clamp(34px, 6vh, 42px);
+  padding: 7px;
+  border: 0;
+  border-radius: 999px;
+  background: transparent;
+  color: #172033;
+}
+
+.app-entry-home-button svg {
+  width: 100%;
+  height: 100%;
+}
+
+.app-entry-main {
+  position: absolute;
+  inset: clamp(82px, 16vh, 118px) max(20px, env(safe-area-inset-right)) max(12px, env(safe-area-inset-bottom)) max(20px, env(safe-area-inset-left));
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  grid-template-rows: auto minmax(0, 1fr);
+  align-content: start;
+  gap: clamp(18px, 3.2vh, 24px);
+  overflow: hidden;
+}
+
+.app-entry-intro {
+  display: grid;
+  justify-items: start;
+  gap: 8px;
+  min-width: 0;
+}
+
+.app-entry-badge {
+  display: inline-flex;
+  max-width: 100%;
+  padding: 6px 12px;
+  border-radius: 999px;
+  background: #edf4ff;
+  color: #1a73e8;
+  font-size: clamp(10px, 1.1vw, 12px);
+  font-weight: 800;
+  line-height: 1;
+  white-space: nowrap;
+}
+
+.app-entry-intro h1 {
+  max-width: 13ch;
+  margin: 0;
+  color: #13213d;
+  font-size: clamp(22px, 3.6vw, 28px);
+  font-weight: 830;
+  line-height: 1.08;
+  letter-spacing: 0;
+}
+
+.app-entry-intro p {
+  max-width: 32ch;
+  margin: 0;
+  color: #667085;
+  font-size: clamp(11px, 1.6vw, 14px);
+  line-height: 1.3;
+}
+
+.app-entry-options {
+  display: grid;
+  align-content: stretch;
+  gap: 12px;
+  width: 100%;
+  min-width: 0;
+}
+
+.app-entry-option {
+  display: grid;
+  grid-template-columns: 58px minmax(0, 1fr) 34px;
+  align-items: center;
+  gap: 12px;
+  width: 100%;
+  min-width: 0;
+  min-height: 96px;
+  padding: 12px;
+  border: 1px solid #e4eaf3;
+  border-radius: 16px;
+  background: #fff;
+  box-shadow: 0 10px 24px rgba(15, 23, 42, .08);
+  color: inherit;
+  text-align: left;
+}
+
+.app-entry-option-icon {
+  display: grid;
+  place-items: center;
+  width: 58px;
+  height: 58px;
+  overflow: hidden;
+  border-radius: 14px;
+}
+
+.app-entry-option-icon svg {
+  width: 100%;
+  height: 100%;
+}
+
+.app-entry-option-copy {
+  display: grid;
+  gap: 4px;
+  min-width: 0;
+}
+
+.app-entry-option-copy strong {
+  color: #172033;
+  font-size: clamp(13px, 1.7vw, 17px);
+  font-weight: 820;
+  line-height: 1.1;
+  letter-spacing: 0;
+}
+
+.app-entry-option-copy span {
+  color: #667085;
+  font-size: clamp(10px, 1.2vw, 13px);
+  line-height: 1.24;
+}
+
+.app-entry-option-arrow {
+  display: grid;
+  place-items: center;
+  justify-self: end;
+  width: 32px;
+  height: 32px;
+  border-radius: 999px;
+  font-size: 1.1rem;
+  font-weight: 900;
+}
+
+.app-entry-option-blue .app-entry-option-arrow {
+  color: #1a73e8;
+  background: #edf4ff;
+}
+
+.app-entry-option-green .app-entry-option-arrow {
+  color: #16a34a;
+  background: #eaf8ef;
+}
+
+@media (orientation: landscape) {
+  .app-entry-header {
+    padding: max(10px, env(safe-area-inset-top)) max(clamp(22px, 4vw, 48px), env(safe-area-inset-right)) 0 max(clamp(22px, 4vw, 48px), env(safe-area-inset-left));
+  }
+
+  .app-entry-brand-title {
+    font-size: clamp(18px, 3.1vh, 24px);
+  }
+
+  .app-entry-brand-subtitle {
+    font-size: clamp(9px, 1.55vh, 12px);
+  }
+
+  .app-entry-main {
+    inset: clamp(64px, 13vh, 100px) max(clamp(24px, 4vw, 64px), env(safe-area-inset-right)) max(12px, env(safe-area-inset-bottom)) max(clamp(24px, 4vw, 64px), env(safe-area-inset-left));
+    grid-template-columns: minmax(190px, 380px) minmax(340px, 680px);
+    grid-template-rows: minmax(0, 1fr);
+    align-items: center;
+    justify-content: center;
+    align-content: stretch;
+    gap: clamp(22px, 7vw, 96px);
+  }
+
+  .app-entry-intro {
+    align-content: center;
+    gap: clamp(6px, 1.8vh, 12px);
+  }
+
+  .app-entry-badge {
+    font-size: clamp(9px, 1.55vh, 12px);
+  }
+
+  .app-entry-intro h1 {
+    max-width: 15ch;
+    font-size: clamp(18px, 4vh, 28px);
+  }
+
+  .app-entry-intro p {
+    font-size: clamp(10px, 1.85vh, 14px);
+    line-height: 1.28;
+  }
+
+  .app-entry-options {
+    align-self: center;
+    gap: clamp(8px, 2.5vh, 16px);
+  }
+
+  .app-entry-option {
+    grid-template-columns: clamp(42px, 10vh, 68px) minmax(0, 1fr) clamp(28px, 6vh, 38px);
+    gap: clamp(10px, 2.2vw, 18px);
+    min-height: clamp(54px, 12vh, 72px);
+    padding: clamp(8px, 1.7vh, 12px);
+  }
+
+  .app-entry-option-icon {
+    width: clamp(42px, 10vh, 68px);
+    height: clamp(42px, 10vh, 68px);
+  }
+
+  .app-entry-option-copy strong {
+    font-size: clamp(13px, 2.35vh, 18px);
+  }
+
+  .app-entry-option-copy span {
+    font-size: clamp(9px, 1.65vh, 13px);
+  }
+}
+
+@media (orientation: landscape) and (max-height: 430px) {
+  .app-entry-main {
+    inset: clamp(48px, 13vh, 64px) clamp(16px, 3vw, 36px) max(8px, env(safe-area-inset-bottom));
+    grid-template-columns: minmax(160px, 260px) minmax(320px, 560px);
+    gap: clamp(14px, 5vw, 56px);
+  }
+
+  .app-entry-intro h1 {
+    font-size: clamp(16px, 4vh, 22px);
+  }
+
+  .app-entry-intro p {
+    font-size: clamp(9px, 1.8vh, 12px);
+  }
+
+  .app-entry-option {
+    min-height: clamp(58px, 18vh, 78px);
+  }
+}
+
+@media (orientation: portrait) and (max-height: 680px) {
+  .app-entry-header {
+    padding: max(12px, env(safe-area-inset-top)) 18px 0;
+  }
+
+  .app-entry-main {
+    inset: clamp(78px, 15vh, 96px) 18px max(8px, env(safe-area-inset-bottom));
+    gap: 14px;
+  }
+
+  .app-entry-options {
+    gap: 12px;
+  }
+
+  .app-entry-option {
+    min-height: min(176px, 24vh);
+  }
+}
+
+/* ===== UI consistency: entrada ===== */
+.app-entry-home-button {
+  width: 38px !important;
+  height: 38px !important;
+  min-width: 38px !important;
+  min-height: 38px !important;
+  padding: 7px !important;
+  border: 0 !important;
+  border-radius: 0 !important;
+  background: transparent !important;
+  box-shadow: none !important;
+}
+
+.app-entry-home-button svg {
+  width: 24px !important;
+  height: 24px !important;
+  display: block !important;
+  stroke-width: 2.2px !important;
+}
+
+@media (orientation: portrait) {
+  .app-entry-main {
+    inset: clamp(78px, 13vh, 104px) 14px max(10px, env(safe-area-inset-bottom)) !important;
+    gap: 16px !important;
+  }
+
+  .app-entry-intro h1 {
+    max-width: 18ch !important;
+    font-size: clamp(20px, 6.4vw, 26px) !important;
+    font-weight: 760 !important;
+    line-height: 1.08 !important;
+  }
+
+  .app-entry-intro p {
+    max-width: 36ch !important;
+    font-size: clamp(11px, 3.2vw, 13px) !important;
+    line-height: 1.28 !important;
+  }
+
+  .app-entry-option {
+    min-height: min(178px, 25vh) !important;
+  }
+}
+
+.app-entry-option,
+.app-entry-option-copy,
+.app-entry-option-copy strong,
+.app-entry-option-copy span {
+  font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif !important;
+}
+
+.app-entry-option-copy strong {
+  font-size: clamp(14px, 3.4vw, 16px) !important;
+  font-weight: 720 !important;
+  line-height: 1.14 !important;
+}
+
+.app-entry-option-copy span {
+  font-size: clamp(10px, 2.65vw, 12px) !important;
+  font-weight: 500 !important;
+  line-height: 1.25 !important;
+}
+
+@media (orientation: landscape) {
+  body #app .player-app.is-app-screen .screen-center.home-screen .assisted-home .google-home-main {
+    position: relative !important;
+    display: grid !important;
+    grid-template-columns: minmax(180px, 360px) minmax(340px, 690px) !important;
+    grid-template-rows: minmax(0, 1fr) !important;
+    align-items: center !important;
+    justify-content: center !important;
+    gap: clamp(22px, 7vw, 92px) !important;
+    width: 100% !important;
+    height: 100% !important;
+    min-height: 0 !important;
+    padding: 4px max(clamp(22px, 4vw, 56px), env(safe-area-inset-right)) max(8px, env(safe-area-inset-bottom)) max(clamp(22px, 4vw, 56px), env(safe-area-inset-left)) !important;
+    overflow: hidden !important;
+    transform: none !important;
+  }
+
+  body #app .player-app.is-app-screen .screen-center.home-screen .assisted-home .assisted-intro-panel,
+  body #app .player-app.is-app-screen .screen-center.home-screen .assisted-home .assisted-actions-panel {
+    position: static !important;
+    inset: auto !important;
+    left: auto !important;
+    top: auto !important;
+    right: auto !important;
+    bottom: auto !important;
+    width: 100% !important;
+    max-width: none !important;
+    min-width: 0 !important;
+    height: auto !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    display: grid !important;
+    transform: none !important;
+    translate: none !important;
+    opacity: 1 !important;
+    visibility: visible !important;
+  }
+
+  body #app .player-app.is-app-screen .screen-center.home-screen .assisted-home .assisted-intro-panel {
+    grid-column: 1 !important;
+    align-self: center !important;
+    justify-self: stretch !important;
+  }
+
+  body #app .player-app.is-app-screen .screen-center.home-screen .assisted-home .assisted-actions-panel {
+    grid-column: 2 !important;
+    align-self: center !important;
+    justify-self: stretch !important;
+    grid-template-rows: repeat(2, minmax(54px, auto)) !important;
+    gap: clamp(8px, 2.2vh, 14px) !important;
+  }
+
+  body #app .player-app.is-app-screen .screen-center.home-screen .assisted-home .assisted-intro-panel h1 {
+    max-width: 15ch !important;
+    margin: 0 !important;
+    font-size: clamp(18px, 4vh, 30px) !important;
+    line-height: 1.08 !important;
+    letter-spacing: 0 !important;
+  }
+
+  body #app .player-app.is-app-screen .screen-center.home-screen .assisted-home .assisted-intro-panel p {
+    max-width: 32ch !important;
+    margin: 8px 0 0 !important;
+    font-size: clamp(10px, 1.9vh, 14px) !important;
+    line-height: 1.25 !important;
+  }
+
+  body #app .player-app.is-app-screen .screen-center.home-screen .assisted-home .assisted-option-card {
+    position: static !important;
+    width: 100% !important;
+    min-width: 0 !important;
+    min-height: clamp(54px, 12vh, 78px) !important;
+    display: grid !important;
+    grid-template-columns: clamp(42px, 8vh, 62px) minmax(0, 1fr) clamp(28px, 5vh, 34px) !important;
+    gap: clamp(10px, 2vw, 16px) !important;
+    padding: clamp(8px, 1.8vh, 13px) !important;
+    align-items: center !important;
+    transform: none !important;
+  }
+
+  body #app .player-app.is-app-screen .screen-center.home-screen .speech-home .google-home-main {
+    position: relative !important;
+    display: grid !important;
+    grid-template-columns: minmax(180px, 340px) minmax(420px, 760px) !important;
+    grid-template-rows: minmax(0, 1fr) !important;
+    align-items: center !important;
+    justify-content: center !important;
+    gap: clamp(20px, 6vw, 78px) !important;
+    width: 100% !important;
+    height: 100% !important;
+    min-height: 0 !important;
+    padding: 4px max(clamp(22px, 4vw, 56px), env(safe-area-inset-right)) max(8px, env(safe-area-inset-bottom)) max(clamp(22px, 4vw, 56px), env(safe-area-inset-left)) !important;
+    overflow: hidden !important;
+    transform: none !important;
+  }
+
+  body #app .player-app.is-app-screen .screen-center.home-screen .speech-home .speech-intro-panel,
+  body #app .player-app.is-app-screen .screen-center.home-screen .speech-home .speech-work-panel {
+    position: static !important;
+    inset: auto !important;
+    width: 100% !important;
+    max-width: none !important;
+    min-width: 0 !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    transform: none !important;
+    translate: none !important;
+    opacity: 1 !important;
+    visibility: visible !important;
+  }
+
+  body #app .player-app.is-app-screen .screen-center.home-screen .speech-home .speech-intro-panel {
+    grid-column: 1 !important;
+    align-self: center !important;
+    justify-self: stretch !important;
+  }
+
+  body #app .player-app.is-app-screen .screen-center.home-screen .speech-home .speech-work-panel {
+    grid-column: 2 !important;
+    align-self: center !important;
+    justify-self: stretch !important;
+    display: grid !important;
+    gap: clamp(6px, 1.4vh, 10px) !important;
+  }
+}
+
+/* Legibilidade: caixas que mostram frases para leitura não usam bold pesado. */
+body #app .speech-phrase-card strong,
+body #app .home-screen .speech-home:not(.review-home) .speech-phrase-card strong,
+body #app .result-phrase-copy strong,
+body #app .speech-summary-copy strong,
+body #app .reading-focus,
+body #app .line-focus,
+body #app .word-context,
+body #app .reader-line-focus,
+body #app .reader-word-focus,
+body #app .reader-word-context,
+body #app .reader-word-chip {
+  font-weight: 400 !important;
+}
+
+/* Sistema comum de botões: cores iguais em todas as janelas. */
+body #app {
+  --ui-primary: #1a73e8;
+  --ui-primary-pressed: #155ec1;
+  --ui-primary-soft: #e8f0fe;
+  --ui-primary-border: #c6dafc;
+  --ui-secondary-bg: #f3f6fb;
+  --ui-secondary-border: #e5eaf2;
+  --ui-secondary-text: #344054;
+  --ui-disabled-bg: #f6f8fb;
+  --ui-disabled-text: #a4acb8;
+}
+
+body #app .main-action {
+  background: var(--ui-primary) !important;
+  color: #fff !important;
+  border-color: var(--ui-primary) !important;
+  box-shadow: none !important;
+}
+
+body #app .main-action:active {
+  background: var(--ui-primary-pressed) !important;
+  border-color: var(--ui-primary-pressed) !important;
+}
+
+body #app .soft-action,
+body #app .pill-btn,
+body #app .result-listen-btn,
+body #app .result-feedback-listen-btn,
+body #app .listen-btn,
+body #app .syllable-toggle {
+  background: var(--ui-secondary-bg) !important;
+  color: var(--ui-secondary-text) !important;
+  border-color: var(--ui-secondary-border) !important;
+  box-shadow: none !important;
+}
+
+body #app .result-listen-btn,
+body #app .result-feedback-listen-btn,
+body #app .listen-btn,
+body #app .syllable-toggle {
+  font-weight: 500 !important;
+}
+
+body #app .soft-action.active,
+body #app .pill-btn.active,
+body #app .syllable-toggle.active,
+body #app .controls-compact .pill-btn.active,
+body #app .reader-controls-panel .pill-btn.active {
+  background: var(--ui-primary-soft) !important;
+  color: var(--ui-primary) !important;
+  border-color: var(--ui-primary-border) !important;
+}
+
+body #app .main-action:disabled,
+body #app .soft-action:disabled,
+body #app .pill-btn:disabled {
+  background: var(--ui-disabled-bg) !important;
+  color: var(--ui-disabled-text) !important;
+  border-color: var(--ui-disabled-bg) !important;
+  opacity: 1 !important;
+}
+
+body #app .app-entry-option-arrow,
+body #app .flow-option-arrow {
+  background: var(--ui-primary-soft) !important;
+  color: var(--ui-primary) !important;
+}
+
+/* Última barreira contra o legacy: frases de leitura sempre em peso regular. */
+body #app .reader-speech-result-panel .result-phrase-copy strong,
+body #app .reader-controls-panel .speech-summary-copy strong,
+body #app .speech-phrase-card strong,
+body #app .reading-focus,
+body #app .line-focus,
+body #app .word-context,
+body #app .reader-line-focus,
+body #app .reader-word-focus,
+body #app .reader-word-context,
+body #app .reader-word-chip {
+  font-weight: 400 !important;
+  letter-spacing: 0 !important;
+}
+
+body #app .reader-speech-result-panel .result-listen-btn,
+body #app .reader-speech-result-panel .result-feedback-listen-btn,
+body #app .reader-controls-panel .listen-btn {
+  background: var(--ui-secondary-bg) !important;
+  color: var(--ui-secondary-text) !important;
+  border-color: var(--ui-secondary-border) !important;
+  box-shadow: none !important;
+}
+
 </style>

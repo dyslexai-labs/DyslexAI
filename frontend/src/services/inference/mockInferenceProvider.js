@@ -80,6 +80,10 @@ export function createMockInferenceProvider() {
       const spoken = expected === phraseExamples.simple_sentence
         ? 'O gato comeu um pássaro.'
         : expected
+      const isCorrect = expected === spoken
+      const feedbackComment = isCorrect
+        ? 'Muito bem. Leste a frase corretamente.'
+        : 'A leitura não ficou igual. A palavra final foi diferente. Tenta novamente com calma.'
 
       return {
         success: true,
@@ -87,7 +91,11 @@ export function createMockInferenceProvider() {
         clean_text: spoken,
         spoken_text: spoken,
         spoken_lines: [spoken],
-        issues: expected === spoken
+        feedback_comment: feedbackComment,
+        comparison_summary: feedbackComment,
+        positive_feedback: isCorrect ? 'Boa leitura.' : '',
+        improvement_tip: isCorrect ? '' : 'Lê devagar e presta atenção à última palavra.',
+        issues: isCorrect
           ? []
           : [{
             type: 'substituicao',

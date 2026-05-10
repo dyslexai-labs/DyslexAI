@@ -34,3 +34,94 @@ defineProps({
 
 defineEmits(['home'])
 </script>
+
+<style scoped>
+.google-home-header {
+  width: 100% !important;
+  min-width: 0 !important;
+  display: flex !important;
+  align-items: flex-start !important;
+  justify-content: space-between !important;
+  gap: 12px !important;
+  transform: none !important;
+}
+
+.home-brand {
+  position: static !important;
+  display: flex !important;
+  align-items: center !important;
+  gap: 10px !important;
+  min-width: 0 !important;
+  transform: none !important;
+}
+
+.home-brand-copy {
+  min-width: 0 !important;
+}
+
+.header-action-row {
+  position: static !important;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: flex-end !important;
+  margin-left: auto !important;
+  transform: none !important;
+}
+
+.home-help-btn {
+  width: 38px !important;
+  height: 38px !important;
+  min-width: 38px !important;
+  min-height: 38px !important;
+  padding: 7px !important;
+  border: 0 !important;
+  border-radius: 0 !important;
+  background: transparent !important;
+  box-shadow: none !important;
+  color: #172033 !important;
+  display: grid !important;
+  place-items: center !important;
+}
+
+.home-help-btn svg {
+  width: 24px !important;
+  height: 24px !important;
+  display: block !important;
+  stroke-width: 2.2px !important;
+}
+
+@media (orientation: landscape) {
+  .google-home-header {
+    padding: max(8px, env(safe-area-inset-top)) clamp(16px, 4vw, 38px) 4px !important;
+  }
+
+  .home-logo-mark {
+    width: clamp(26px, 4.2vw, 42px) !important;
+    height: clamp(26px, 4.2vw, 42px) !important;
+    min-width: clamp(26px, 4.2vw, 42px) !important;
+    transform: none !important;
+  }
+
+  .home-brand-title {
+    font-size: clamp(1.15rem, 3vw, 1.85rem) !important;
+    line-height: 1 !important;
+    letter-spacing: 0 !important;
+    transform: none !important;
+  }
+
+  .home-brand-subtitle {
+    margin-top: 2px !important;
+    font-size: clamp(.62rem, 1.6vw, .88rem) !important;
+    line-height: 1.1 !important;
+    transform: none !important;
+  }
+
+  .home-help-btn {
+    width: 38px !important;
+    height: 38px !important;
+    min-width: 38px !important;
+    min-height: 38px !important;
+    padding: 7px !important;
+  }
+}
+</style>

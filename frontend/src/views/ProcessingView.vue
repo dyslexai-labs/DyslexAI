@@ -1,5 +1,5 @@
 <template>
-  <section class="screen-center">
+  <section class="screen-center home-screen">
     <div class="google-home processing-home">
       <AppHeader :subtitle="activeFlow === 'audio' ? 'Leitura a partir da fala' : 'Leitura assistida'" @home="$emit('go-home')" />
 
