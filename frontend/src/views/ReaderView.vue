@@ -2176,4 +2176,267 @@ defineEmits([
   font-weight: 500 !important;
 }
 
+.reader-word-chip.active,
+.reader-text-panel .reader-word-chip.active {
+  background: var(--active-word-bg) !important;
+  color: var(--active-word-text) !important;
+  border-radius: 5px !important;
+  box-shadow: 0 0 0 2px rgba(26, 115, 232, .18) !important;
+  padding: 0 .12em !important;
+}
+
+/* Xiaomi/telefones compactos: não herdar layout de tablet. */
+@media (orientation: portrait) and (max-width: 480px) {
+  .reader-view-shell :deep(.google-home-header) {
+    padding: max(10px, env(safe-area-inset-top)) 16px 4px !important;
+  }
+
+  .reader-view-main {
+    grid-template-rows: minmax(72px, 1fr) auto !important;
+    gap: 6px !important;
+    padding: 4px 10px max(8px, env(safe-area-inset-bottom)) !important;
+    overflow: hidden !important;
+  }
+
+  .reader-text-panel {
+    min-height: 0 !important;
+    padding: 4px 0 !important;
+    align-items: center !important;
+    overflow: hidden !important;
+  }
+
+  .reader-line-focus {
+    font-size: clamp(.92rem, 4vw, 1.05rem) !important;
+    line-height: 1.24 !important;
+    font-weight: 400 !important;
+  }
+
+  .reader-controls-panel {
+    max-height: none !important;
+    overflow: visible !important;
+    align-self: end !important;
+  }
+
+  .reader-control-stack {
+    gap: 4px !important;
+  }
+
+  .transport-row {
+    height: 42px !important;
+    min-height: 42px !important;
+    gap: 16px !important;
+    align-items: center !important;
+  }
+
+  .round-btn,
+  .play-btn {
+    width: 44px !important;
+    height: 38px !important;
+    min-width: 44px !important;
+    min-height: 38px !important;
+    font-size: 1.32rem !important;
+  }
+
+  .play-btn {
+    font-size: 1.46rem !important;
+  }
+
+  .progress-label {
+    height: 14px !important;
+    min-height: 14px !important;
+    font-size: .7rem !important;
+  }
+
+  .progress-line {
+    height: 3px !important;
+    min-height: 3px !important;
+  }
+
+  .controls-compact {
+    grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+    gap: 4px !important;
+  }
+
+  .controls-compact .pill-btn,
+  .reader-controls-panel .pill-btn {
+    height: 27px !important;
+    min-height: 27px !important;
+    padding: 3px 7px !important;
+    font-size: .68rem !important;
+    line-height: 1 !important;
+  }
+
+  .settings-panel {
+    height: 58px !important;
+    min-height: 58px !important;
+    max-height: 58px !important;
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) minmax(112px, 1.05fr) !important;
+    gap: 6px !important;
+    padding: 6px 8px !important;
+    overflow: hidden !important;
+  }
+
+  .setting-block {
+    gap: 3px !important;
+    text-align: center !important;
+  }
+
+  .setting-block label {
+    font-size: .62rem !important;
+    line-height: 1 !important;
+  }
+
+  .setting-block input,
+  .setting-block select {
+    height: 22px !important;
+    min-height: 22px !important;
+    font-size: .62rem !important;
+  }
+
+  .check-block {
+    display: none !important;
+  }
+}
+
+@media (orientation: landscape) and (max-height: 430px) {
+  .reader-view-shell :deep(.google-home-header) {
+    padding: max(4px, env(safe-area-inset-top)) 28px 0 !important;
+  }
+
+  .reader-view-shell :deep(.home-logo-mark) {
+    width: 28px !important;
+    height: 28px !important;
+    min-width: 28px !important;
+  }
+
+  .reader-view-shell :deep(.home-brand-title) {
+    font-size: 1.25rem !important;
+    line-height: 1 !important;
+  }
+
+  .reader-view-shell :deep(.home-brand-subtitle) {
+    font-size: .66rem !important;
+    line-height: 1 !important;
+  }
+
+  .reader-header-actions .home-help-btn,
+  .reader-header-actions .reader-header-btn,
+  .reader-view-shell :deep(.home-help-btn) {
+    width: 32px !important;
+    height: 32px !important;
+    min-width: 32px !important;
+    min-height: 32px !important;
+    padding: 5px !important;
+  }
+
+  .reader-header-actions .home-help-btn > svg,
+  .reader-header-actions .reader-header-btn > svg,
+  .reader-view-shell :deep(.home-help-btn > svg) {
+    width: 22px !important;
+    height: 22px !important;
+  }
+
+  .reader-view-main {
+    grid-template-rows: minmax(46px, 1fr) auto !important;
+    gap: 3px !important;
+    padding: 0 28px max(5px, env(safe-area-inset-bottom)) !important;
+    overflow: hidden !important;
+  }
+
+  .reader-text-panel {
+    padding: 0 18px !important;
+    align-items: center !important;
+    overflow: hidden !important;
+  }
+
+  .reader-line-focus {
+    font-size: clamp(.78rem, 3.2vh, .96rem) !important;
+    line-height: 1.18 !important;
+    font-weight: 400 !important;
+  }
+
+  .reader-controls-panel {
+    max-height: none !important;
+    overflow: visible !important;
+    align-self: end !important;
+  }
+
+  .reader-control-stack {
+    gap: 3px !important;
+    padding: 0 !important;
+  }
+
+  .transport-row {
+    height: 28px !important;
+    min-height: 28px !important;
+    gap: 14px !important;
+    align-items: center !important;
+  }
+
+  .round-btn,
+  .play-btn {
+    width: 38px !important;
+    height: 28px !important;
+    min-width: 38px !important;
+    min-height: 28px !important;
+    font-size: 1.08rem !important;
+  }
+
+  .play-btn {
+    font-size: 1.22rem !important;
+  }
+
+  .progress-label {
+    height: 12px !important;
+    min-height: 12px !important;
+    font-size: .62rem !important;
+  }
+
+  .progress-line {
+    height: 3px !important;
+    min-height: 3px !important;
+  }
+
+  .controls-compact {
+    grid-template-columns: repeat(4, minmax(0, 1fr)) !important;
+    gap: 4px 6px !important;
+  }
+
+  .controls-compact .pill-btn,
+  .reader-controls-panel .pill-btn {
+    height: 25px !important;
+    min-height: 25px !important;
+    padding: 3px 6px !important;
+    font-size: .62rem !important;
+    line-height: 1 !important;
+  }
+
+  .settings-panel {
+    height: 54px !important;
+    min-height: 54px !important;
+    max-height: 54px !important;
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) minmax(150px, 1.05fr) !important;
+    gap: 8px !important;
+    padding: 5px 8px !important;
+    overflow: hidden !important;
+  }
+
+  .setting-block {
+    gap: 3px !important;
+    text-align: center !important;
+  }
+
+  .setting-block label {
+    font-size: .62rem !important;
+    line-height: 1 !important;
+  }
+
+  .setting-block input,
+  .setting-block select {
+    height: 22px !important;
+    min-height: 22px !important;
+    font-size: .62rem !important;
+  }
+}
+
 </style>

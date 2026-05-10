@@ -273,7 +273,7 @@ const readingPalette = ref('yellow')
 const fontSize = ref(18)
 const readingMode = ref('line')
 const currentTextMode = ref('simplified')
-const wordAudioMode = ref('silent')
+const wordAudioMode = ref('audio')
 const linePlaybackMode = ref('single')
 
 const currentLineIndex = ref(0)
@@ -387,7 +387,7 @@ const computedWordContextFontSize = computed(() => {
   const base = isLandscape.value ? Math.max(12, Math.min(fontSize.value - 5, 15)) : Math.max(13, Math.min(fontSize.value - 3, 17))
   return Math.max(isLandscape.value ? 11 : 12, base - Math.ceil(longLineFontReduction.value / 2))
 })
-const activeWordStyle = computed(() => isLandscape.value ? { fontSize: '1em' } : { fontSize: '1.04em' })
+const activeWordStyle = computed(() => ({}))
 const viewportClasses = computed(() => ({
   fullscreen: isFullscreen.value,
   'layout-landscape': isLandscape.value,
@@ -1315,8 +1315,9 @@ function canUseBrowserTts() {
 
 function stopNativeTts() {
   if (typeof inference.stopSpeaking === 'function') {
-    inference.stopSpeaking().catch(() => { })
+    return inference.stopSpeaking().catch(() => { })
   }
+  return Promise.resolve()
 }
 
 function speakWithBrowserTts(text) {
@@ -1360,22 +1361,28 @@ function stopWordPlay() {
     playTimer = null
   }
   isPlayingWords.value = false
-  stopNativeTts()
   if (canUseBrowserTts()) window.speechSynthesis.cancel()
+  return stopNativeTts()
 }
 
-function stopAllAudio() {
-  stopWordPlay()
-  stopNativeTts()
+async function stopAllAudio() {
+  wordPlaybackStopped = true
+  if (playTimer) {
+    clearTimeout(playTimer)
+    playTimer = null
+  }
+  isPlayingWords.value = false
+  await stopNativeTts()
   if (canUseBrowserTts()) window.speechSynthesis.cancel()
   isSpeakingLine.value = false
 }
 
-function toggleLineReading() {
+async function toggleLineReading() {
   if (isSpeakingLine.value) {
     stopAllAudio()
     return
   }
+  await stopAllAudio()
   isSpeakingLine.value = true
   speakCurrentLine()
 }
@@ -1420,7 +1427,7 @@ function toggleWordPlay() {
 }
 
 async function startWordPlay() {
-  stopAllAudio()
+  await stopAllAudio()
   isPlayingWords.value = true
   wordPlaybackStopped = false
   while (isPlayingWords.value && !wordPlaybackStopped) {
@@ -1504,7 +1511,7 @@ function resetAll() {
   currentTextMode.value = 'simplified'
   readingPalette.value = 'yellow'
   readingMode.value = 'line'
-  wordAudioMode.value = 'silent'
+  wordAudioMode.value = 'audio'
   linePlaybackMode.value = 'single'
   currentLineIndex.value = 0
   currentWordIndex.value = 0
@@ -12936,6 +12943,15 @@ body #app .reader-controls-panel .listen-btn {
   color: var(--ui-secondary-text) !important;
   border-color: var(--ui-secondary-border) !important;
   box-shadow: none !important;
+}
+
+body #app .reader-word-chip.active,
+body #app .reader-text-panel .reader-word-chip.active {
+  background: var(--active-word-bg) !important;
+  color: var(--active-word-text) !important;
+  border-radius: 5px !important;
+  box-shadow: 0 0 0 2px rgba(26, 115, 232, .18) !important;
+  padding: 0 .12em !important;
 }
 
 </style>
