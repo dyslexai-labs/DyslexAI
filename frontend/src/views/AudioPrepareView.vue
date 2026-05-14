@@ -1,20 +1,21 @@
 <template>
   <section class="flow-view audio-prepare-view">
     <div class="flow-shell audio-prepare-shell">
-      <AppHeader subtitle="Leitura a partir da fala" @home="$emit('go-home')">
+      <AppHeader :subtitle="t('app.speech')" @home="$emit('go-home')">
         <template #actions>
           <div class="audio-header-actions">
             <div class="audio-header-copy">
-              <strong>Prepara a leitura com a tua voz</strong>
+              <strong>{{ t('audio.headerTitle') }}</strong>
               <span>
                 {{ isRecording
-                  ? 'A gravação está a decorrer.'
+                  ? t('audio.recordingRunning')
                   : hasRecordedAudio
-                    ? 'A gravação está pronta.'
-                    : 'Gera uma frase. Depois grava a tua leitura.' }}
+                    ? t('audio.recordingReady')
+                    : t('audio.intro') }}
               </span>
             </div>
-            <button class="home-help-btn audio-header-home" @click="$emit('go-home')" title="Início" aria-label="Início">
+            <LanguageToggle />
+            <button class="home-help-btn audio-header-home" @click="$emit('go-home')" :title="t('app.home')" :aria-label="t('app.home')">
               <svg viewBox="0 0 24 24" aria-hidden="true">
                 <path d="M4 10.5 12 4l8 6.5V20a1 1 0 0 1-1 1h-5v-6h-4v6H5a1 1 0 0 1-1-1z" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/>
               </svg>
@@ -25,38 +26,38 @@
 
       <div class="flow-main audio-prepare-main">
         <section class="flow-intro speech-intro-panel">
-          <h1>Prepara a leitura com a tua voz</h1>
+          <h1>{{ t('audio.headerTitle') }}</h1>
           <p>
             {{ isRecording
-              ? 'A gravação está a decorrer. Quando acabares, carrega em Parar.'
+              ? t('audio.recordingHelp')
               : hasRecordedAudio
-                ? 'A gravação está pronta. Podes ouvir e depois processar.'
-                : 'Gera uma frase. Depois grava a tua leitura.' }}
+                ? t('audio.readyHelp')
+                : t('audio.intro') }}
           </p>
         </section>
 
-        <section class="speech-work-panel" aria-label="Preparar leitura por voz">
+        <section class="speech-work-panel" :aria-label="t('audio.headerTitle')">
           <div class="speech-config-card">
             <div class="speech-config-grid">
-              <label>Idade
+              <label>{{ t('audio.age') }}
                 <select :value="readingAgeGroup" @change="$emit('update:readingAgeGroup', $event.target.value)">
                   <option value="6-7">6-7</option>
                   <option value="8-10">8-10</option>
                   <option value="11-13">11-13</option>
                 </select>
               </label>
-              <label>Nível
+              <label>{{ t('audio.level') }}
                 <select :value="readingLevel" @change="$emit('update:readingLevel', $event.target.value)">
                   <option value="1">1</option>
                   <option value="2">2</option>
                   <option value="3">3</option>
                 </select>
               </label>
-              <label>Tipo
+              <label>{{ t('audio.type') }}
                 <select :value="readingType" @change="$emit('update:readingType', $event.target.value)">
-                  <option value="simple_sentence">Frase simples</option>
-                  <option value="rhyme">Lengalenga</option>
-                  <option value="tongue_twister">Trava-línguas</option>
+                  <option value="simple_sentence">{{ t('audio.typeSimple') }}</option>
+                  <option value="rhyme">{{ t('audio.typeRhyme') }}</option>
+                  <option value="tongue_twister">{{ t('audio.typeTongueTwister') }}</option>
                 </select>
               </label>
             </div>
@@ -64,25 +65,25 @@
             <div class="speech-button-row">
               <button class="soft-action" @click="$emit('generate-phrase')"
                 :disabled="isGeneratingPhrase || isRecording || isRecorderBusy">
-                {{ isGeneratingPhrase ? 'A gerar...' : 'Gerar frase' }}
+                {{ isGeneratingPhrase ? t('audio.generating') : t('audio.generate') }}
               </button>
               <button v-if="expectedReadingText" class="soft-action" @click="$emit('generate-phrase')"
                 :disabled="isGeneratingPhrase || isRecording || isRecorderBusy">
-                Nova frase
+                {{ t('audio.newPhrase') }}
               </button>
             </div>
           </div>
 
           <div class="speech-phrase-card">
-            <span class="speech-label">{{ isGeneratingPhrase ? 'Preparação' : 'Frase a ler' }}</span>
-            <strong>{{ isGeneratingPhrase ? 'A gerar frase...' : (displayReadingText || 'Gera uma frase para começar.') }}</strong>
+            <span class="speech-label">{{ isGeneratingPhrase ? t('audio.preparation') : t('audio.phraseToRead') }}</span>
+            <strong>{{ isGeneratingPhrase ? t('audio.generatingPhrase') : (displayReadingText || t('audio.startHint')) }}</strong>
             <button
               v-if="expectedReadingText"
               class="soft-action syllable-toggle"
               :class="{ active: showSyllables }"
               @click="$emit('update:showSyllables', !showSyllables)"
             >
-              Sílabas
+              {{ t('audio.syllables') }}
             </button>
           </div>
 
@@ -98,7 +99,7 @@
             <div class="speech-record-copy">
               <div class="recording-status-line">
                 <span class="status-pill" :class="{ live: isRecording, ready: hasRecordedAudio && !isRecording }">
-                  {{ isRecording ? 'A gravar' : (hasRecordedAudio ? 'Gravação pronta' : 'À espera de gravação') }}
+                  {{ isRecording ? t('audio.recording') : (hasRecordedAudio ? t('audio.recorded') : t('audio.waiting')) }}
                 </span>
                 <span class="recording-timer" :class="{ live: isRecording }">{{ recordingElapsedLabel }}</span>
               </div>
@@ -110,21 +111,21 @@
           <div class="record-controls speech-record-controls">
             <button class="soft-action speech-inline-generate" @click="$emit('generate-phrase')"
               :disabled="isGeneratingPhrase || isRecording || isRecorderBusy">
-              {{ isGeneratingPhrase ? 'A gerar...' : 'Gerar frase' }}
+              {{ isGeneratingPhrase ? t('audio.generating') : t('audio.generate') }}
             </button>
             <button class="soft-action speech-inline-generate" @click="$emit('generate-phrase')"
               :disabled="isGeneratingPhrase || isRecording || isRecorderBusy || !expectedReadingText">
-              Nova frase
+              {{ t('audio.newPhrase') }}
             </button>
             <button class="main-action" @click="$emit('start-recording')"
               :disabled="isRecording || isRecorderBusy || !expectedReadingText || isGeneratingPhrase">
-              {{ isRecording ? 'A gravar...' : 'Gravar' }}
+              {{ isRecording ? t('audio.recordingButton') : t('audio.record') }}
             </button>
-            <button class="soft-action" @click="$emit('stop-recording')" :disabled="!isRecording">Parar</button>
+            <button class="soft-action" @click="$emit('stop-recording')" :disabled="!isRecording">{{ t('audio.stop') }}</button>
             <button class="soft-action" @click="$emit('clear-recorded-audio')"
-              :disabled="isRecording || !hasRecordedAudio">Limpar</button>
+              :disabled="isRecording || !hasRecordedAudio">{{ t('audio.clear') }}</button>
             <button class="soft-action" @click="$emit('process-audio')"
-              :disabled="isRecording || !hasRecordedAudio || !expectedReadingText">Processar</button>
+              :disabled="isRecording || !hasRecordedAudio || !expectedReadingText">{{ t('audio.process') }}</button>
           </div>
         </section>
       </div>
@@ -138,6 +139,8 @@
 import { computed } from 'vue'
 import AppHeader from '../components/common/AppHeader.vue'
 import BottomNav from '../components/common/BottomNav.vue'
+import LanguageToggle from '../components/common/LanguageToggle.vue'
+import { t } from '../i18n'
 
 const props = defineProps({
   audioPreviewUrl: {

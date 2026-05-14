@@ -1,6 +1,6 @@
 <template>
   <div class="player-app" :class="[viewportClasses, { 'is-entry-screen': screen === 'home', 'is-app-screen': screen !== 'home' }]">
-    <section v-if="nativeModelGateVisible" class="model-setup-view" aria-label="Preparação do modelo local">
+    <section v-if="nativeModelGateVisible" class="model-setup-view" :aria-label="t('model.preparing')">
       <div class="model-setup-panel">
         <div class="model-setup-brand">
           <div class="app-entry-logo" aria-hidden="true">
@@ -15,8 +15,8 @@
           </div>
         </div>
 
-        <p class="model-setup-copy">This may take several minutes on first launch.</p>
-        <p class="model-setup-copy">Recommended: Wi-Fi connection.</p>
+        <p class="model-setup-copy">{{ t('model.firstLaunch') }}</p>
+        <p class="model-setup-copy">{{ t('model.wifi') }}</p>
 
         <div class="model-progress-block" role="status" aria-live="polite">
           <div class="model-progress-header">
@@ -32,13 +32,13 @@
         </div>
 
         <button v-if="modelStatus === 'error'" class="model-retry-button" @click="retryModelDownload">
-          Retry download
+          {{ t('model.retry') }}
         </button>
       </div>
     </section>
 
     <main class="app-shell">
-      <section v-if="screen === 'home'" class="app-entry-view" aria-label="Entrada">
+      <section v-if="screen === 'home'" class="app-entry-view" :aria-label="t('home.modesLabel')">
         <header class="app-entry-header">
           <div class="app-entry-brand">
             <div class="app-entry-logo" aria-hidden="true">
@@ -49,25 +49,28 @@
             </div>
             <div class="app-entry-brand-copy">
               <div class="app-entry-brand-title">Dyslex<span>AI</span></div>
-              <div class="app-entry-brand-subtitle">Leitor guiado</div>
+              <div class="app-entry-brand-subtitle">{{ t('app.subtitle') }}</div>
             </div>
           </div>
 
-          <button class="app-entry-home-button" title="Início" aria-label="Início" @click="goHome">
+          <div class="app-entry-actions">
+            <LanguageToggle />
+            <button class="app-entry-home-button" :title="t('app.home')" :aria-label="t('app.home')" @click="goHome">
             <svg viewBox="0 0 24 24" aria-hidden="true">
               <path d="M4 10.5 12 4l8 6.5V20a1 1 0 0 1-1 1h-5v-6h-4v6H5a1 1 0 0 1-1-1z" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round" />
             </svg>
-          </button>
+            </button>
+          </div>
         </header>
 
         <main class="app-entry-main">
           <section class="app-entry-intro">
-            <div class="app-entry-badge">👋 Bem-vindo(a)!</div>
-            <h1>Escolhe como queres começar</h1>
-            <p>Escolhe uma imagem ou grava a tua voz. Depois lê com ajuda, passo a passo.</p>
+            <div class="app-entry-badge">{{ t('home.badge') }}</div>
+            <h1>{{ t('home.title') }}</h1>
+            <p>{{ t('home.description') }}</p>
           </section>
 
-          <section class="app-entry-options" aria-label="Modos de leitura">
+          <section class="app-entry-options" :aria-label="t('home.modesLabel')">
             <button class="app-entry-option app-entry-option-blue" @click="startImageFlow">
               <div class="app-entry-option-icon" aria-hidden="true">
                 <svg viewBox="0 0 96 96" role="img" focusable="false">
@@ -80,8 +83,8 @@
                 </svg>
               </div>
               <div class="app-entry-option-copy">
-                <strong>Leitura assistida</strong>
-                <span>Usa uma imagem ou texto para preparar a leitura.</span>
+                <strong>{{ t('home.assistedTitle') }}</strong>
+                <span>{{ t('home.assistedDescription') }}</span>
               </div>
               <div class="app-entry-option-arrow" aria-hidden="true">&gt;</div>
             </button>
@@ -97,8 +100,8 @@
                 </svg>
               </div>
               <div class="app-entry-option-copy">
-                <strong>Leitura a partir da fala</strong>
-                <span>Grava a fala do aluno e gera uma frase para leitura guiada.</span>
+                <strong>{{ t('home.speechTitle') }}</strong>
+                <span>{{ t('home.speechDescription') }}</span>
               </div>
               <div class="app-entry-option-arrow" aria-hidden="true">&gt;</div>
             </button>
@@ -209,19 +212,19 @@
       <div class="modal-card">
         <div class="modal-header">
           <div>
-            <div class="mini-label">Validação</div>
-            <h3>Texto completo</h3>
+            <div class="mini-label">{{ t('app.validation') }}</div>
+            <h3>{{ t('app.fullText') }}</h3>
           </div>
-          <button class="pill-btn" @click="openValidation = false">Fechar</button>
+          <button class="pill-btn" @click="openValidation = false">{{ t('app.close') }}</button>
         </div>
 
         <div class="modal-tabs">
           <button class="pill-btn" :class="{ active: currentTextMode === 'original' }"
-            @click="switchTextMode('original')">Original</button>
+            @click="switchTextMode('original')">{{ t('reader.original') }}</button>
           <button class="pill-btn" :class="{ active: currentTextMode === 'simplified' }"
-            @click="switchTextMode('simplified')">Simplificado</button>
+            @click="switchTextMode('simplified')">{{ t('reader.simplified') }}</button>
           <button v-if="hasSpokenText" class="pill-btn" :class="{ active: currentTextMode === 'spoken' }"
-            @click="switchTextMode('spoken')">Falado</button>
+            @click="switchTextMode('spoken')">{{ t('reader.spoken') }}</button>
         </div>
 
         <textarea class="text-output" :value="validationText" readonly></textarea>
@@ -243,6 +246,8 @@ import ImageConfirmView from './views/ImageConfirmView.vue'
 import ImageSourceView from './views/ImageSourceView.vue'
 import ProcessingView from './views/ProcessingView.vue'
 import ReaderView from './views/ReaderView.vue'
+import LanguageToggle from './components/common/LanguageToggle.vue'
+import { t } from './i18n'
 
 const inference = createInferenceService()
 const route = useRoute()
@@ -266,7 +271,7 @@ const modelStatus = ref('checking')
 const modelProgressPercent = ref(0)
 const modelDownloadedMb = ref(0)
 const modelTotalMb = ref(0)
-const modelSetupMessage = ref('Preparing local AI model...')
+const modelSetupMessage = ref(t('model.preparing'))
 const modelErrorMessage = ref('')
 const modelReadyForApp = ref(false)
 const previewUrl = ref('')
@@ -294,18 +299,18 @@ const nativeModelGateVisible = computed(() => {
 })
 
 const modelSetupTitle = computed(() => {
-  if (modelStatus.value === 'downloading') return 'Preparing local AI model...'
-  if (modelStatus.value === 'error') return modelSetupMessage.value || 'Download failed.'
-  return 'Preparing local AI model...'
+  if (modelStatus.value === 'downloading') return t('model.preparing')
+  if (modelStatus.value === 'error') return modelSetupMessage.value || t('model.downloadFailed')
+  return t('model.preparing')
 })
 
 const modelProgressLabel = computed(() => {
   if (modelStatus.value === 'error') {
-    return modelErrorMessage.value || 'Please check your connection and try again.'
+    return modelErrorMessage.value || t('model.connectionHint')
   }
 
   const downloaded = formatModelSize(modelDownloadedMb.value)
-  const total = modelTotalMb.value > 0 ? formatModelSize(modelTotalMb.value) : 'calculating...'
+  const total = modelTotalMb.value > 0 ? formatModelSize(modelTotalMb.value) : t('model.calculating')
   return `${downloaded} / ${total}`
 })
 
@@ -353,8 +358,8 @@ const autoAdvanceLine = ref(true)
 const speechRate = ref(1.0)
 
 const processingProgress = ref(0)
-const processingMessage = ref('A preparar...')
-const processingTitle = ref('A preparar a leitura')
+const processingMessage = ref(t('processing.preparing'))
+const processingTitle = ref(t('processing.titleImage'))
 
 const imageOptimizationMaxEdge = 900
 const imageOptimizationQuality = 0.72
@@ -534,16 +539,16 @@ function applyModelProgress(payload = {}) {
   modelDownloadedMb.value = Number(payload.downloadedMb || 0)
   modelTotalMb.value = Number(payload.totalMb || 0)
 
-  if (payload.message) {
+  if (payload.message && payload.message !== 'Downloading model...' && payload.message !== 'Model installed successfully') {
     modelSetupMessage.value = payload.message
   } else if (status === 'downloading') {
-    modelSetupMessage.value = 'Downloading model...'
+    modelSetupMessage.value = t('model.downloading')
   } else if (status === 'installed') {
-    modelSetupMessage.value = 'Model installed successfully'
+    modelSetupMessage.value = t('model.installed')
   }
 
   if (status === 'error') {
-    modelErrorMessage.value = payload.error || 'Please check your connection and try again.'
+    modelErrorMessage.value = payload.error || t('model.connectionHint')
   }
 }
 
@@ -554,7 +559,7 @@ async function prepareNativeModel() {
 
   modelStatus.value = 'checking'
   modelReadyForApp.value = false
-  modelSetupMessage.value = 'Preparing local AI model...'
+  modelSetupMessage.value = t('model.preparing')
   modelErrorMessage.value = ''
 
   try {
@@ -566,7 +571,7 @@ async function prepareNativeModel() {
       ...(result?.model || {}),
       status: 'installed',
       percent: 100,
-      message: result?.message || 'Model installed successfully',
+      message: t('model.installed'),
     })
 
     warmed = true
@@ -577,9 +582,9 @@ async function prepareNativeModel() {
   } catch (error) {
     modelStatus.value = 'error'
     modelSetupMessage.value = error?.message?.includes('runtime failed')
-      ? 'Local runtime failed to start.'
-      : 'Download failed.'
-    modelErrorMessage.value = error?.message || 'Please check your connection and try again.'
+      ? t('model.failed')
+      : t('model.downloadFailed')
+    modelErrorMessage.value = error?.message || t('model.connectionHint')
   }
 }
 
@@ -714,14 +719,14 @@ async function takePhoto() {
       correctOrientation: true,
     })
 
-    if (!image.dataUrl) throw new Error('A fotografia não devolveu dados.')
+    if (!image.dataUrl) throw new Error(t('errors.photoEmpty'))
 
     const mimeType = `image/${image.format || 'jpeg'}`
     await setSelectedImageFromDataUrl(image.dataUrl, mimeType)
   } catch (error) {
     console.error('[DyslexAI] Erro ao tirar fotografia:', error)
     if (error?.message !== 'User cancelled photos app') {
-      alert('Não foi possível tirar fotografia.')
+      alert(t('errors.photoFailed'))
     }
   }
 }
@@ -737,14 +742,14 @@ async function pickFromGallery() {
       correctOrientation: true,
     })
 
-    if (!image.dataUrl) throw new Error('A imagem não devolveu dados.')
+    if (!image.dataUrl) throw new Error(t('errors.imageEmpty'))
 
     const mimeType = `image/${image.format || 'jpeg'}`
     await setSelectedImageFromDataUrl(image.dataUrl, mimeType)
   } catch (error) {
     console.error('[DyslexAI] Erro ao escolher imagem:', error)
     if (error?.message !== 'User cancelled photos app') {
-      alert('Não foi possível escolher imagem.')
+      alert(t('errors.pickImageFailed'))
     }
   }
 }
@@ -781,7 +786,7 @@ async function startRecording() {
   if (isRecording.value || isRecorderBusy.value) return
 
   if (!expectedReadingText.value) {
-    alert('Gera primeiro uma frase para o aluno ler.')
+    alert(t('errors.phraseFirst'))
     return
   }
 
@@ -800,7 +805,7 @@ async function startRecording() {
       return
     } catch (error) {
       console.error('[DyslexAI] Erro ao iniciar gravação WAV nativa:', error)
-      alert(error?.message || 'Não foi possível iniciar a gravação de áudio.')
+      alert(error?.message || t('errors.recordingStartFailed'))
       isRecording.value = false
       stopRecordingTimer()
       return
@@ -810,7 +815,7 @@ async function startRecording() {
   }
 
   if (!(navigator.mediaDevices && window.MediaRecorder)) {
-    alert('A gravação de áudio não é suportada neste navegador.')
+    alert(t('errors.recordingUnsupported'))
     return
   }
 
@@ -844,7 +849,7 @@ async function startRecording() {
 
     mediaRecorder.onerror = (event) => {
       console.error('Erro na gravação:', event)
-      alert('Não foi possível gravar o áudio.')
+      alert(t('errors.recordingFailed'))
       stopMediaTracks()
       isRecording.value = false
       stopRecordingTimer()
@@ -871,7 +876,7 @@ async function startRecording() {
     mediaRecorder.start()
   } catch (error) {
     console.error(error)
-    alert('Não foi possível aceder ao microfone.')
+    alert(t('errors.microphoneFailed'))
     stopMediaTracks()
     isRecording.value = false
     stopRecordingTimer()
@@ -890,7 +895,7 @@ async function stopRecording() {
       const result = await inference.stopWavRecording()
 
       if (!result?.audioBase64) {
-        throw new Error('A gravação WAV nativa não devolveu áudio.')
+        throw new Error(t('errors.nativeAudioEmpty'))
       }
 
       const audioBlob = dataUrlToBlob(result.audioBase64, result.mimeType || 'audio/wav')
@@ -909,7 +914,7 @@ async function stopRecording() {
       return
     } catch (error) {
       console.error('[DyslexAI] Erro ao parar gravação WAV nativa:', error)
-      alert('Não foi possível terminar a gravação de áudio.')
+      alert(t('errors.recordingStopFailed'))
       isRecording.value = false
       stopRecordingTimer()
       return
@@ -927,7 +932,7 @@ function dataUrlToBlob(dataUrl, fallbackMimeType = 'application/octet-stream') {
   const [header, base64] = String(dataUrl || '').split(',')
 
   if (!base64) {
-    throw new Error('Data URL inválido.')
+    throw new Error(t('errors.invalidDataUrl'))
   }
 
   const mimeMatch = header.match(/data:([^;]+);base64/i)
@@ -1030,11 +1035,11 @@ async function generateReadingPhrase() {
     syllabifiedSimplifiedText.value = syllabifiedOriginalText.value
 
     if (!expectedReadingText.value) {
-      throw new Error('Não foi possível gerar a frase.')
+      throw new Error(t('errors.phraseFailed'))
     }
   } catch (error) {
     console.error('[DyslexAI] Erro ao gerar frase:', error)
-    alert(error?.message || 'Erro ao gerar frase.')
+    alert(error?.message || t('errors.phraseGeneric'))
   } finally {
     isGeneratingPhrase.value = false
   }
@@ -1061,7 +1066,7 @@ async function onImageChange(event) {
     await setSelectedImageFromDataUrl(dataUrl, selectedImageMimeType.value)
   } catch (error) {
     console.error('[DyslexAI] Erro ao ler imagem selecionada:', error)
-    alert('Não foi possível ler a imagem selecionada.')
+    alert(t('errors.readImageFailed'))
     selectedFile.value = null
     selectedImageBase64.value = ''
     previewUrl.value = ''
@@ -1082,7 +1087,7 @@ function onAudioChange(event) {
 
 async function processRealImage() {
   if (!selectedImageBase64.value) {
-    throw new Error('Não existe imagem preparada.')
+    throw new Error(t('errors.noPreparedImage'))
   }
 
   const data = await inference.processImage({
@@ -1105,7 +1110,7 @@ async function processRealAudio(file) {
 
   if (normalized.no_speech_detected) {
     throw new NoSpeechDetectedError(
-      normalized.comparison_summary || normalized.improvement_tip || 'Não ouvi fala suficiente na gravação. Tenta gravar novamente.'
+      normalized.comparison_summary || normalized.improvement_tip || t('errors.noSpeech')
     )
   }
 
@@ -1301,56 +1306,56 @@ function syllabifyWord(value) {
 
 async function processImage() {
   if (!selectedImageBase64.value) {
-    alert('Nenhuma imagem selecionada.')
+    alert(t('errors.noImageSelected'))
     return
   }
 
   try {
     setScreen('processing')
-    processingTitle.value = 'A preparar a leitura'
+    processingTitle.value = t('processing.titleImage')
     processingProgress.value = 15
-    processingMessage.value = 'A enviar imagem...'
+    processingMessage.value = t('processing.sendingImage')
     await new Promise(resolve => setTimeout(resolve, 180))
     processingProgress.value = 45
-    processingMessage.value = 'A processar texto...'
+    processingMessage.value = t('processing.processingText')
     await processRealImage()
     processingProgress.value = 100
-    processingMessage.value = 'Concluído.'
+    processingMessage.value = t('processing.done')
     enterReader('simplified')
   } catch (error) {
     console.error(error)
-    alert(error.message || 'Ocorreu um erro ao processar a imagem.')
+    alert(error.message || t('errors.processImageFailed'))
     setScreen('confirm-image')
   }
 }
 
 async function processAudio() {
   if (!selectedAudioFile.value) {
-    alert('Ainda não existe uma gravação pronta.')
+    alert(t('errors.noRecording'))
     return
   }
   if (!expectedReadingText.value) {
-    alert('Gera primeiro a frase que o aluno deve ler.')
+    alert(t('errors.expectedPhraseFirst'))
     return
   }
 
   try {
     setScreen('processing')
-    processingTitle.value = 'A preparar a leitura a partir da fala'
+    processingTitle.value = t('processing.titleAudio')
     processingProgress.value = 15
-    processingMessage.value = 'A enviar áudio...'
+    processingMessage.value = t('processing.sendingAudio')
     await new Promise(resolve => setTimeout(resolve, 180))
     processingProgress.value = 55
-    processingMessage.value = 'A transcrever a fala...'
+    processingMessage.value = t('processing.transcribing')
     await processRealAudio(selectedAudioFile.value)
     processingProgress.value = 100
-    processingMessage.value = 'Concluído.'
+    processingMessage.value = t('processing.done')
     enterReader('spoken')
   } catch (error) {
     console.error(error)
     alert(error instanceof NoSpeechDetectedError
       ? error.message
-      : (error.message || 'Ocorreu um erro ao processar o áudio.'))
+      : (error.message || t('errors.processAudioFailed')))
     setScreen('confirm-audio')
   }
 }
@@ -1675,8 +1680,8 @@ function resetAll() {
   currentLineIndex.value = 0
   currentWordIndex.value = 0
   processingProgress.value = 0
-  processingMessage.value = 'A preparar...'
-  processingTitle.value = 'A preparar a leitura'
+  processingMessage.value = t('processing.preparing')
+  processingTitle.value = t('processing.titleImage')
 }
 
 onMounted(async () => {
@@ -12660,6 +12665,14 @@ body,
   color: #667085;
   font-size: clamp(10px, 1vw, 12px);
   line-height: 1.15;
+}
+
+.app-entry-actions {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 8px;
+  margin-left: auto;
 }
 
 .app-entry-home-button {

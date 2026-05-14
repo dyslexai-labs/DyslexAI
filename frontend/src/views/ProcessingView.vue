@@ -1,7 +1,7 @@
 <template>
   <section class="screen-center home-screen">
     <div class="google-home processing-home">
-      <AppHeader :subtitle="activeFlow === 'audio' ? 'Leitura a partir da fala' : 'Leitura assistida'" @home="$emit('go-home')" />
+      <AppHeader :subtitle="activeFlow === 'audio' ? t('app.speech') : t('app.assisted')" @home="$emit('go-home')" />
 
       <div class="google-home-main">
         <section class="processing-panel" aria-live="polite">
@@ -23,6 +23,7 @@
 <script setup>
 import AppHeader from '../components/common/AppHeader.vue'
 import BottomNav from '../components/common/BottomNav.vue'
+import { t } from '../i18n'
 
 defineProps({
   activeFlow: {

@@ -1,5 +1,6 @@
 import { DyslexAIPlugin } from './capacitorDyslexAI'
 import { IMAGE_INFERENCE_TIMEOUT_MS } from '../../config'
+import { locale } from '../../i18n'
 
 function withTimeout(promise, timeoutMs, message) {
   let timeoutId
@@ -30,7 +31,7 @@ export function createMobileInferenceProvider() {
     },
 
     async processText(text) {
-      return DyslexAIPlugin.processText({ text })
+      return DyslexAIPlugin.processText({ text, locale: locale.value })
     },
 
     async processImage(payload) {
@@ -42,6 +43,7 @@ export function createMobileInferenceProvider() {
         DyslexAIPlugin.processImage({
           imageBase64: payload.imageBase64,
           mimeType: payload.mimeType || 'image/jpeg',
+          locale: locale.value,
         }),
         IMAGE_INFERENCE_TIMEOUT_MS,
         `A inferência da imagem excedeu o tempo limite de ${Math.round(IMAGE_INFERENCE_TIMEOUT_MS / 1000)} segundos.`
@@ -53,6 +55,7 @@ export function createMobileInferenceProvider() {
         ageGroup: options.ageGroup || '8-10',
         level: options.level || '1',
         type: options.type || 'simple_sentence',
+        locale: locale.value,
       })
     },
 
@@ -63,6 +66,7 @@ export function createMobileInferenceProvider() {
         audioBase64,
         mimeType: file?.type || 'audio/wav',
         expectedText,
+        locale: locale.value,
       })
     },
 
@@ -70,6 +74,7 @@ export function createMobileInferenceProvider() {
       return DyslexAIPlugin.speak({
         text,
         rate,
+        locale: locale.value,
       })
     },
 

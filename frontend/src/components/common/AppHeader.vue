@@ -9,12 +9,13 @@
       </div>
       <div class="home-brand-copy">
         <div class="home-brand-title">Dyslex<span>AI</span></div>
-        <div class="home-brand-subtitle">{{ subtitle }}</div>
+        <div class="home-brand-subtitle">{{ subtitle || t('app.subtitle') }}</div>
       </div>
     </div>
     <slot name="actions">
       <div class="header-action-row">
-        <button class="home-help-btn" title="Início" aria-label="Início" @click="$emit('home')">
+        <LanguageToggle />
+        <button class="home-help-btn" :title="t('app.home')" :aria-label="t('app.home')" @click="$emit('home')">
           <svg viewBox="0 0 24 24" aria-hidden="true">
             <path d="M4 10.5 12 4l8 6.5V20a1 1 0 0 1-1 1h-5v-6h-4v6H5a1 1 0 0 1-1-1z" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/>
           </svg>
@@ -25,10 +26,13 @@
 </template>
 
 <script setup>
+import LanguageToggle from './LanguageToggle.vue'
+import { t } from '../../i18n'
+
 defineProps({
   subtitle: {
     type: String,
-    default: 'Leitor guiado',
+    default: '',
   },
 })
 
@@ -64,6 +68,7 @@ defineEmits(['home'])
   display: flex !important;
   align-items: center !important;
   justify-content: flex-end !important;
+  gap: 8px !important;
   margin-left: auto !important;
   transform: none !important;
 }

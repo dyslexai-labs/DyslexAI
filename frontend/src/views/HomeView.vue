@@ -1,5 +1,5 @@
 <template>
-  <section class="entry-view" aria-label="Entrada">
+  <section class="entry-view" :aria-label="t('home.modesLabel')">
     <header class="entry-header">
       <div class="entry-brand">
         <div class="entry-logo" aria-hidden="true">
@@ -10,11 +10,11 @@
         </div>
         <div class="entry-brand-copy">
           <div class="entry-brand-title">Dyslex<span>AI</span></div>
-          <div class="entry-brand-subtitle">Leitor guiado</div>
+          <div class="entry-brand-subtitle">{{ t('app.subtitle') }}</div>
         </div>
       </div>
 
-      <button class="entry-home-button" title="Início" aria-label="Início" @click="$emit('go-home')">
+      <button class="entry-home-button" :title="t('app.home')" :aria-label="t('app.home')" @click="$emit('go-home')">
         <svg viewBox="0 0 24 24" aria-hidden="true">
           <path d="M4 10.5 12 4l8 6.5V20a1 1 0 0 1-1 1h-5v-6h-4v6H5a1 1 0 0 1-1-1z" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/>
         </svg>
@@ -23,12 +23,12 @@
 
     <main class="entry-main">
       <section class="entry-intro">
-        <div class="entry-badge">👋 Bem-vindo(a)!</div>
-        <h1>Escolhe como queres começar</h1>
-        <p>Escolhe uma imagem ou grava a tua voz. Depois lê com ajuda, passo a passo.</p>
+        <div class="entry-badge">{{ t('home.badge') }}</div>
+        <h1>{{ t('home.title') }}</h1>
+        <p>{{ t('home.description') }}</p>
       </section>
 
-      <section class="entry-options" aria-label="Modos de leitura">
+      <section class="entry-options" :aria-label="t('home.modesLabel')">
         <button class="entry-option entry-option-blue" @click="$emit('start-image')">
           <div class="entry-option-icon" aria-hidden="true">
             <svg viewBox="0 0 96 96" role="img" focusable="false">
@@ -41,8 +41,8 @@
             </svg>
           </div>
           <div class="entry-option-copy">
-            <strong>Leitura assistida</strong>
-            <span>Usa uma imagem ou texto para preparar a leitura.</span>
+            <strong>{{ t('home.assistedTitle') }}</strong>
+            <span>{{ t('home.assistedDescription') }}</span>
           </div>
           <div class="entry-option-arrow" aria-hidden="true">&gt;</div>
         </button>
@@ -58,8 +58,8 @@
             </svg>
           </div>
           <div class="entry-option-copy">
-            <strong>Leitura a partir da fala</strong>
-            <span>Grava a fala do aluno e gera uma frase para leitura guiada.</span>
+            <strong>{{ t('home.speechTitle') }}</strong>
+            <span>{{ t('home.speechDescription') }}</span>
           </div>
           <div class="entry-option-arrow" aria-hidden="true">&gt;</div>
         </button>
@@ -69,6 +69,8 @@
 </template>
 
 <script setup>
+import { t } from '../i18n'
+
 defineEmits(['start-image', 'start-audio', 'go-home'])
 </script>
 

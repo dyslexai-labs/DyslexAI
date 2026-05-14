@@ -1,23 +1,23 @@
 <template>
   <section class="flow-view image-confirm-view">
     <div class="flow-shell image-confirm-shell">
-      <AppHeader subtitle="Leitura assistida" @home="$emit('go-home')" />
+      <AppHeader :subtitle="t('app.assisted')" @home="$emit('go-home')" />
 
       <div class="flow-main image-confirm-main">
         <section class="flow-intro image-confirm-intro">
-          <h1>Confirma a imagem</h1>
-          <p>Verifica se a imagem está legível antes de processar.</p>
+          <h1>{{ t('imageConfirm.title') }}</h1>
+          <p>{{ t('imageConfirm.description') }}</p>
         </section>
 
-        <section class="confirm-panel" aria-label="Confirmar imagem">
+        <section class="confirm-panel" :aria-label="t('imageConfirm.label')">
           <div class="confirm-preview-card">
-            <img v-if="previewUrl" :src="previewUrl" alt="Pré-visualização" class="confirm-preview-image" />
-            <div v-else class="confirm-empty">Sem imagem selecionada.</div>
+            <img v-if="previewUrl" :src="previewUrl" :alt="t('imageConfirm.previewAlt')" class="confirm-preview-image" />
+            <div v-else class="confirm-empty">{{ t('imageConfirm.empty') }}</div>
           </div>
 
           <div class="confirm-controls">
-            <button class="main-action" @click="$emit('process-image')">Processar</button>
-            <button class="soft-action" @click="$emit('choose-other')">Outra imagem</button>
+            <button class="main-action" @click="$emit('process-image')">{{ t('imageConfirm.process') }}</button>
+            <button class="soft-action" @click="$emit('choose-other')">{{ t('imageConfirm.chooseOther') }}</button>
           </div>
         </section>
       </div>
@@ -30,6 +30,7 @@
 <script setup>
 import AppHeader from '../components/common/AppHeader.vue'
 import BottomNav from '../components/common/BottomNav.vue'
+import { t } from '../i18n'
 
 defineProps({
   previewUrl: {

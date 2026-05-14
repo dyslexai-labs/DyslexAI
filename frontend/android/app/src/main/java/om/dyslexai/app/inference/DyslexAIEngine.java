@@ -63,11 +63,15 @@ public class DyslexAIEngine {
     }
 
     public JSObject processText(Context context, String text) throws Exception {
+        return processText(context, text, "pt");
+    }
+
+    public JSObject processText(Context context, String text, String locale) throws Exception {
         ensureRuntime(context);
 
         Log.i(TAG, "processText() -> texto recebido com comprimento=" + (text == null ? 0 : text.length()));
 
-        String prompt = buildSimplificationPrompt(text);
+        String prompt = isEnglish(locale) ? buildSimplificationPromptEn(text) : buildSimplificationPrompt(text);
         Log.i(TAG, "Prompt de simplificação enviada ao runtime:\n" + prompt);
 
         String rawSimplified = runtime.inferText(prompt);
@@ -81,10 +85,14 @@ public class DyslexAIEngine {
             simplified = text;
         }
 
-        return buildResult(text, simplified);
+        return buildResult(text, simplified, locale);
     }
 
     public JSObject processImage(Context context, String imageBase64, String mimeType) throws Exception {
+        return processImage(context, imageBase64, mimeType, "pt");
+    }
+
+    public JSObject processImage(Context context, String imageBase64, String mimeType, String locale) throws Exception {
         long totalStart = System.nanoTime();
         ensureRuntime(context);
 
@@ -96,7 +104,7 @@ public class DyslexAIEngine {
         Log.i(TAG, "processImage() one-pass -> bytes decodificados=" + imageBytes.length +
                 ", decodeMs=" + elapsedMs(decodeStart));
 
-        String prompt = buildImageFullPrompt();
+        String prompt = isEnglish(locale) ? buildImageFullPromptEn() : buildImageFullPrompt();
         Log.i(TAG, "Prompt única de imagem enviada ao runtime (" + prompt.length() + " chars):\n" + prompt);
 
         long inferStart = System.nanoTime();
@@ -117,17 +125,22 @@ public class DyslexAIEngine {
         meta.put("image_mode", "frontend-image");
         meta.put("parse_ms", elapsedMs(parseStart));
         meta.put("total_ms", elapsedMs(totalStart));
+        meta.put("locale", normalizeLocale(locale));
 
         Log.i(TAG, "processImage() one-pass -> totalMs=" + elapsedMs(totalStart));
         return result;
     }
 
     public JSObject generateReadingPhrase(Context context, String ageGroup, String level, String type) throws Exception {
+        return generateReadingPhrase(context, ageGroup, level, type, "pt");
+    }
+
+    public JSObject generateReadingPhrase(Context context, String ageGroup, String level, String type, String locale) throws Exception {
         ensureRuntime(context);
 
         Log.i(TAG, "generateReadingPhrase() -> ageGroup=" + ageGroup + ", level=" + level + ", type=" + type);
 
-        String prompt = buildReadingPhrasePrompt(ageGroup, level, type);
+        String prompt = isEnglish(locale) ? buildReadingPhrasePromptEn(ageGroup, level, type) : buildReadingPhrasePrompt(ageGroup, level, type);
         Log.i(TAG, "Prompt de geração de frase enviada ao runtime:\n" + prompt);
 
         String raw = runtime.inferText(prompt);
@@ -137,11 +150,15 @@ public class DyslexAIEngine {
         Log.i(TAG, "Resposta limpa da geração de frase:\n" + cleaned);
 
         JSObject result = parseGeneratedPhrase(cleaned, ageGroup, level, type);
+        if (isEnglish(locale) && result.optString("language", "").trim().isEmpty()) {
+            result.put("language", "en");
+        }
         Log.i(TAG, "Frase gerada final -> text=" + result.optString("text", ""));
 
         JSObject meta = new JSObject();
         meta.put("source", "mobile");
         meta.put("engine", runtime.getName());
+        meta.put("locale", normalizeLocale(locale));
 
         result.put("success", true);
         result.put("meta", meta);
@@ -149,6 +166,10 @@ public class DyslexAIEngine {
     }
 
     public JSObject processAudio(Context context, String audioBase64, String mimeType, String expectedText) throws Exception {
+        return processAudio(context, audioBase64, mimeType, expectedText, "pt");
+    }
+
+    public JSObject processAudio(Context context, String audioBase64, String mimeType, String expectedText, String locale) throws Exception {
         ensureRuntime(context);
 
         Log.i(TAG, "processAudio() REAL chamado.");
@@ -166,11 +187,11 @@ public class DyslexAIEngine {
 
             if (!signalInfo.hasLikelySpeech()) {
                 Log.w(TAG, "processAudio() -> áudio sem fala provável. Vou evitar inferência local.");
-                return buildAudioNoSpeechResult(expectedText, mimeType, audioBytes.length, signalInfo);
+                return buildAudioNoSpeechResult(expectedText, mimeType, audioBytes.length, signalInfo, locale);
             }
         }
 
-        String transcriptionPrompt = buildAudioTranscriptionOnlyPrompt();
+        String transcriptionPrompt = isEnglish(locale) ? buildAudioTranscriptionOnlyPromptEn() : buildAudioTranscriptionOnlyPrompt();
         Log.i(TAG, "Prompt de TRANSCRIÇÃO enviada ao runtime:\n" + transcriptionPrompt);
 
         String rawTranscription;
@@ -178,7 +199,7 @@ public class DyslexAIEngine {
             rawTranscription = runtime.inferAudio(audioBytes, mimeType, transcriptionPrompt);
         } catch (Exception e) {
             Log.e(TAG, "inferAudio() falhou. Vou usar fallback controlado.", e);
-            return buildAudioDecodeFallbackResult(expectedText, mimeType, audioBytes.length, e);
+            return buildAudioDecodeFallbackResult(expectedText, mimeType, audioBytes.length, e, locale);
         }
 
         Log.i(TAG, "Resposta bruta da TRANSCRIÇÃO:\n" + rawTranscription);
@@ -198,7 +219,9 @@ public class DyslexAIEngine {
         JSObject feedbackParsed = new JSObject();
 
         if (!transcription.trim().isEmpty()) {
-            String feedbackPrompt = buildAudioReadingFeedbackPrompt(expectedText, transcription);
+            String feedbackPrompt = isEnglish(locale)
+                    ? buildAudioReadingFeedbackPromptEn(expectedText, transcription)
+                    : buildAudioReadingFeedbackPrompt(expectedText, transcription);
             Log.i(TAG, "Prompt de FEEDBACK enviada ao runtime:\n" + feedbackPrompt);
 
             try {
@@ -224,7 +247,7 @@ public class DyslexAIEngine {
         String feedbackComment = safe(feedbackParsed.optString("feedback_comment", ""), "");
 
         if (feedbackComment.trim().isEmpty()) {
-            feedbackComment = "Tenta ler novamente com calma.";
+            feedbackComment = isEnglish(locale) ? "Try reading again slowly." : "Tenta ler novamente com calma.";
         }
 
         JSArray issues = extractIssues(feedbackParsed);
@@ -264,6 +287,7 @@ public class DyslexAIEngine {
         meta.put("source", "mobile");
         meta.put("engine", runtime.getName());
         meta.put("mode", "audio-gemma-local-transcribe-then-feedback-v2-single-comment");
+        meta.put("locale", normalizeLocale(locale));
 
         result.put("meta", meta);
 
@@ -280,6 +304,18 @@ public class DyslexAIEngine {
                 "- Se não perceberes alguma palavra, escreve a aproximação que ouviste.\n" +
                 "- Responde apenas em JSON válido, sem markdown.\n" +
                 "Formato obrigatório: {\"transcription\":\"texto dito no áudio\"}";
+    }
+
+    private String buildAudioTranscriptionOnlyPromptEn() {
+        return "Transcribe the audio in English.\n" +
+                "Mandatory rules:\n" +
+                "- Write only what was said in the audio.\n" +
+                "- Do not correct the sentence.\n" +
+                "- Do not invent words.\n" +
+                "- Do not use any expected phrase, because this step has no expected phrase.\n" +
+                "- If you do not understand a word, write the closest approximation you heard.\n" +
+                "- Reply only with valid JSON, without markdown.\n" +
+                "Required format: {\"transcription\":\"text said in the audio\"}";
     }
 
     private String buildAudioReadingFeedbackPrompt(String expectedText, String spokenTranscription) {
@@ -356,6 +392,65 @@ public class DyslexAIEngine {
                 "}";
     }
 
+    private String buildAudioReadingFeedbackPromptEn(String expectedText, String spokenTranscription) {
+        String expected = safe(expectedText, "");
+        String spoken = safe(spokenTranscription, "");
+
+        return "You are a reading assistant for children with dyslexia.\n" +
+                "You will compare two already-written sentences.\n" +
+                "Always reply in English. Use simple child-friendly language.\n\n" +
+
+                "Original sentence:\n" + expected + "\n\n" +
+                "Sentence transcribed from the child's voice:\n" + spoken + "\n\n" +
+
+                "Task:\n" +
+                "1. Keep the original sentence exactly in expected_text.\n" +
+                "2. Keep the transcribed sentence exactly in spoken_text.\n" +
+                "3. Split the original sentence into syllables.\n" +
+                "4. Split the transcribed sentence into syllables, if readable.\n" +
+                "5. Write ONE short, simple and correct comment for the child to hear.\n\n" +
+
+                "Rules for the comment:\n" +
+                "- Say clearly whether the sentence is correct or not.\n" +
+                "- If it is correct, give simple praise.\n" +
+                "- If it is incorrect, identify all differences between the sentences.\n" +
+                "- Do not say it is correct if there are different words, extra words or missing words.\n" +
+                "- Do not contradict the comparison.\n" +
+                "- Use short sentences.\n" +
+                "- Do not use technical terms.\n" +
+                "- The comment must be suitable for a child to hear out loud.\n\n" +
+
+                "Rules for syllable splitting:\n" +
+                "- Keep spaces between words.\n" +
+                "- Use hyphens only inside words.\n" +
+                "- Never join different words with hyphens.\n" +
+                "- If the transcribed sentence is unreadable or incomplete, leave syllabified_spoken_text empty.\n\n" +
+
+                "Examples:\n" +
+                "cat -> cat\n" +
+                "little -> lit-tle\n" +
+                "reading -> read-ing\n" +
+                "computer -> com-pu-ter\n" +
+                "The cat ate the fish. -> The cat ate the fish.\n\n" +
+
+                "Before answering, check:\n" +
+                "- that you did not join different words with hyphens.\n" +
+                "- that the comment clearly says whether the reading is correct or not.\n\n" +
+
+                "Reply ONLY with valid JSON, without markdown, without ```json.\n\n" +
+
+                "{\n" +
+                "  \"expected_text\": \"original sentence\",\n" +
+                "  \"syllabified_expected_text\": \"original sentence split into syllables\",\n" +
+                "  \"spoken_text\": \"transcribed sentence\",\n" +
+                "  \"syllabified_spoken_text\": \"transcribed sentence split into syllables or empty if unreadable\",\n" +
+                "  \"feedback_comment\": \"one simple, correct comment addressed to the child\",\n" +
+                "  \"issues\": [\n" +
+                "    { \"type\": \"correct|omission|substitution|extra_word|pronunciation|order|other\", \"expected\": \"...\", \"spoken\": \"...\", \"comment\": \"simple explanation\" }\n" +
+                "  ]\n" +
+                "}";
+    }
+
     private String extractLikelyPlainTranscription(String raw) {
         String text = cleanModelText(raw);
         JSObject parsed = parseModelJson(text);
@@ -395,12 +490,19 @@ public class DyslexAIEngine {
         return text.replaceAll("\\s+", " ").trim();
     }
 
-    private JSObject buildAudioDecodeFallbackResult(String expectedText, String mimeType, int audioBytesLength, Exception error) {
+    private JSObject buildAudioDecodeFallbackResult(String expectedText, String mimeType, int audioBytesLength, Exception error, String locale) {
         String fallbackText = safe(expectedText, "");
+        boolean english = isEnglish(locale);
 
         if (fallbackText.trim().isEmpty()) {
-            fallbackText = "Não consegui transcrever o áudio, mas a gravação foi recebida.";
+            fallbackText = english
+                    ? "I could not transcribe the audio, but the recording was received."
+                    : "Não consegui transcrever o áudio, mas a gravação foi recebida.";
         }
+
+        String feedback = english
+                ? "I could not complete the reading analysis. Try recording again in a quiet place."
+                : "Não foi possível obter uma análise completa da leitura. Tenta gravar novamente num local silencioso.";
 
         JSObject result = new JSObject();
         result.put("success", true);
@@ -411,8 +513,8 @@ public class DyslexAIEngine {
         result.put("spoken_lines", toJsArray(splitLines(fallbackText)));
         result.put("syllabified_expected_text", fallbackText);
         result.put("syllabified_spoken_text", fallbackText);
-        result.put("feedback_comment", "Não foi possível obter uma análise completa da leitura. Tenta gravar novamente num local silencioso.");
-        result.put("comparison_summary", "Não foi possível obter uma análise completa da leitura. Tenta gravar novamente num local silencioso.");
+        result.put("feedback_comment", feedback);
+        result.put("comparison_summary", feedback);
         result.put("positive_feedback", "");
         result.put("improvement_tip", "");
         result.put("issues", new JSArray());
@@ -424,6 +526,7 @@ public class DyslexAIEngine {
         meta.put("mimeType", safe(mimeType, ""));
         meta.put("audioBytes", audioBytesLength);
         meta.put("error", error == null ? "" : safe(error.getMessage(), ""));
+        meta.put("locale", normalizeLocale(locale));
 
         result.put("meta", meta);
 
@@ -433,9 +536,12 @@ public class DyslexAIEngine {
         return result;
     }
 
-    private JSObject buildAudioNoSpeechResult(String expectedText, String mimeType, int audioBytesLength, AudioSignalInfo signalInfo) {
+    private JSObject buildAudioNoSpeechResult(String expectedText, String mimeType, int audioBytesLength, AudioSignalInfo signalInfo, String locale) {
         String expected = safe(expectedText, "");
-        String feedback = "Não ouvi fala suficiente na gravação. Tenta gravar novamente, falando perto do microfone.";
+        boolean english = isEnglish(locale);
+        String feedback = english
+                ? "I did not hear enough speech in the recording. Try recording again, speaking close to the microphone."
+                : "Não ouvi fala suficiente na gravação. Tenta gravar novamente, falando perto do microfone.";
 
         JSObject result = new JSObject();
         result.put("success", true);
@@ -450,7 +556,7 @@ public class DyslexAIEngine {
         result.put("feedback_comment", feedback);
         result.put("comparison_summary", feedback);
         result.put("positive_feedback", "");
-        result.put("improvement_tip", "Grava outra vez e lê a frase em voz alta.");
+        result.put("improvement_tip", english ? "Record again and read the phrase out loud." : "Grava outra vez e lê a frase em voz alta.");
         result.put("issues", new JSArray());
 
         JSObject meta = new JSObject();
@@ -462,6 +568,7 @@ public class DyslexAIEngine {
         meta.put("durationSeconds", signalInfo == null ? 0.0 : signalInfo.durationSeconds);
         meta.put("rms", signalInfo == null ? 0.0 : signalInfo.rms);
         meta.put("peak", signalInfo == null ? 0 : signalInfo.peak);
+        meta.put("locale", normalizeLocale(locale));
 
         result.put("meta", meta);
         return result;
@@ -630,6 +737,10 @@ public class DyslexAIEngine {
     }
 
     private JSObject buildResult(String originalText, String simplifiedText) {
+        return buildResult(originalText, simplifiedText, "pt");
+    }
+
+    private JSObject buildResult(String originalText, String simplifiedText, String locale) {
         JSObject result = new JSObject();
         result.put("success", true);
         result.put("original_text", originalText);
@@ -640,6 +751,7 @@ public class DyslexAIEngine {
         JSObject meta = new JSObject();
         meta.put("source", "mobile");
         meta.put("engine", runtime.getName());
+        meta.put("locale", normalizeLocale(locale));
 
         result.put("meta", meta);
 
@@ -742,6 +854,11 @@ public class DyslexAIEngine {
                 + text;
     }
 
+    private String buildSimplificationPromptEn(String text) {
+        return "Simplify in English for a dyslexic reader. Use short sentences and simple words. Return only the final text.\n\n"
+                + text;
+    }
+
     private String buildReadingPhrasePrompt(String ageGroup, String level, String type) {
         return "You are an educational assistant for dyslexic students.\n\n" +
                 "Generate one reading sentence in European Portuguese for a child.\n\n" +
@@ -760,6 +877,27 @@ public class DyslexAIEngine {
                 "  \"type\": \"...\",\n" +
                 "  \"level\": \"...\",\n" +
                 "  \"language\": \"pt-PT\"\n" +
+                "}";
+    }
+
+    private String buildReadingPhrasePromptEn(String ageGroup, String level, String type) {
+        return "You are an educational assistant for dyslexic students.\n\n" +
+                "Generate one reading sentence in English for a child.\n\n" +
+                "Requirements:\n" +
+                "- age group: " + safe(ageGroup, "7-8") + "\n" +
+                "- difficulty level: " + safe(level, "1") + "\n" +
+                "- type: " + safe(type, "simple_sentence") + "\n" +
+                "- short and readable\n" +
+                "- natural English\n" +
+                "- suitable for guided reading\n" +
+                "- no explanations\n" +
+                "- return only valid JSON\n\n" +
+                "JSON schema:\n" +
+                "{\n" +
+                "  \"text\": \"...\",\n" +
+                "  \"type\": \"...\",\n" +
+                "  \"level\": \"...\",\n" +
+                "  \"language\": \"en\"\n" +
                 "}";
     }
 
@@ -793,6 +931,14 @@ public class DyslexAIEngine {
 
     private String safe(String value, String fallback) {
         return value == null || value.trim().isEmpty() ? fallback : value.trim();
+    }
+
+    private boolean isEnglish(String locale) {
+        return "en".equals(normalizeLocale(locale));
+    }
+
+    private String normalizeLocale(String locale) {
+        return locale != null && locale.toLowerCase().startsWith("en") ? "en" : "pt";
     }
 
     private List<String> splitLines(String text) {
@@ -1025,5 +1171,14 @@ public class DyslexAIEngine {
                 "Responde só neste formato curto:\n" +
                 "ORIGINAL: texto transcrito\n" +
                 "SIMPLIFICADO: texto simplificado";
+    }
+
+    private String buildImageFullPromptEn() {
+        return "Transcribe the visible text in the image and create a simplified version for dyslexia in English.\n" +
+                "Reply only with valid JSON, without markdown.\n" +
+                "{\n" +
+                "  \"original_text\": \"transcribed text\",\n" +
+                "  \"simplified_text\": \"simplified text\"\n" +
+                "}";
     }
 }

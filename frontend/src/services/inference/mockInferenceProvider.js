@@ -6,6 +6,12 @@ const phraseExamples = {
   tongue_twister: 'Três tigres tristes trazem trigo, trocam três pratos tortos e tentam treinar tranquilamente junto ao trilho estreito.',
 }
 
+const phraseExamplesEn = {
+  simple_sentence: 'The small cat found a blue backpack in the school garden and walked slowly to the classroom door.',
+  rhyme: 'The ball rolls by the wall, then bounces in the hall and comes back when the children call.',
+  tongue_twister: 'Three thin thinkers threw three thick things through the tall theatre door.',
+}
+
 const longReadingText = 'O gato pequeno encontrou uma mochila azul no jardim da escola e caminhou devagar até à porta da sala para mostrar a todos os colegas o que tinha descoberto.'
 
 const silentWavDataUrl = 'data:audio/wav;base64,UklGRiQAAABXQVZFZm10IBAAAAABAAEAQB8AAEAfAAABAAgAZGF0YQAAAAA='
@@ -62,9 +68,10 @@ export function createMockInferenceProvider() {
 
     async generateReadingPhrase(options = {}) {
       await delay()
+      const examples = options.locale === 'en' ? phraseExamplesEn : phraseExamples
       return {
         success: true,
-        text: phraseExamples[options.type] || phraseExamples.simple_sentence,
+        text: examples[options.type] || examples.simple_sentence,
         meta: {
           source: 'mock',
           ageGroup: options.ageGroup || '8-10',

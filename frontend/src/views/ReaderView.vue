@@ -1,15 +1,16 @@
 <template>
   <section class="reader-view-screen">
     <div class="reader-view-shell" :class="{ 'reader-speech-result': isSpeechResult, 'reader-settings-open': !isSpeechResult }">
-      <AppHeader :subtitle="isSpeechResult ? 'Leitura a partir da fala' : 'Leitura assistida'">
+      <AppHeader :subtitle="isSpeechResult ? t('app.speech') : t('app.assisted')">
         <template #actions>
           <div class="reader-header-actions">
-            <button class="home-help-btn reader-header-btn" @click="$emit('reset-all')" title="Início" aria-label="Início">
+            <LanguageToggle />
+            <button class="home-help-btn reader-header-btn" @click="$emit('reset-all')" :title="t('app.home')" :aria-label="t('app.home')">
               <svg viewBox="0 0 24 24" aria-hidden="true">
                 <path d="M4 10.5 12 4l8 6.5V20a1 1 0 0 1-1 1h-5v-6h-4v6H5a1 1 0 0 1-1-1z" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/>
               </svg>
             </button>
-            <button v-if="activeFlow === 'image' && !isSpeechResult" class="home-help-btn reader-header-btn reader-text-btn" @click="$emit('open-validation')" title="Texto completo" aria-label="Texto completo">
+            <button v-if="activeFlow === 'image' && !isSpeechResult" class="home-help-btn reader-header-btn reader-text-btn" @click="$emit('open-validation')" :title="t('app.fullText')" :aria-label="t('app.fullText')">
               <svg viewBox="0 0 24 24" aria-hidden="true">
                 <path d="M4 6h16M4 12h16M4 18h16" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"/>
               </svg>
@@ -22,7 +23,7 @@
         <div v-if="!isSpeechResult" class="reader-text-panel">
         <div v-if="readingMode === 'line'" class="reader-line-focus"
           :style="{ fontSize: `${computedLineFontSize}px`, color: paletteStyles.lineText || '#172033' }">
-          {{ currentLines[currentLineIndex] || 'Sem texto disponível.' }}
+          {{ currentLines[currentLineIndex] || t('reader.noText') }}
         </div>
 
         <div v-else class="reader-word-focus" :style="{ fontSize: `${computedWordContextFontSize}px` }">
@@ -37,30 +38,30 @@
         </div>
         </div>
 
-        <section v-if="isSpeechResult" class="reader-speech-result-panel" aria-label="Resultado da leitura por voz">
+        <section v-if="isSpeechResult" class="reader-speech-result-panel" :aria-label="t('reader.speechResultLabel')">
           <article v-if="expectedReadingText" class="result-phrase-card">
             <div class="result-phrase-copy">
-              <span class="speech-label">Frase esperada</span>
+              <span class="speech-label">{{ t('reader.expectedPhrase') }}</span>
               <strong>{{ expectedReadingText }}</strong>
             </div>
             <div class="result-action-stack">
-              <button class="soft-action result-listen-btn" @click="$emit('speak-text', expectedReadingText)">Ouvir</button>
+              <button class="soft-action result-listen-btn" @click="$emit('speak-text', expectedReadingText)">{{ t('reader.listen') }}</button>
             </div>
           </article>
 
           <article v-if="hasSpokenText" class="result-phrase-card">
             <div class="result-phrase-copy">
-              <span class="speech-label">Frase transcrita</span>
+              <span class="speech-label">{{ t('reader.transcribedPhrase') }}</span>
               <strong>{{ spokenText }}</strong>
             </div>
             <div class="result-action-stack">
-              <button class="soft-action result-listen-btn" @click="$emit('speak-text', spokenText)">Ouvir</button>
+              <button class="soft-action result-listen-btn" @click="$emit('speak-text', spokenText)">{{ t('reader.listen') }}</button>
               <button
                 v-if="audioFeedbackText"
                 class="soft-action result-feedback-listen-btn"
                 @click="$emit('speak-text', audioFeedbackText)"
               >
-                Ouvir comentário
+                {{ t('reader.listenComment') }}
               </button>
             </div>
           </article>
@@ -70,18 +71,18 @@
           <div v-if="activeFlow === 'audio' && (expectedReadingText || hasSpokenText)" class="reader-summary-stack">
             <div v-if="expectedReadingText" class="speech-summary-box">
               <div class="speech-summary-copy">
-                <span class="speech-label">Frase esperada</span>
+                <span class="speech-label">{{ t('reader.expectedPhrase') }}</span>
                 <strong>{{ expectedReadingText }}</strong>
               </div>
-              <button class="pill-btn listen-btn" @click="$emit('speak-text', expectedReadingText)">Ouvir</button>
+              <button class="pill-btn listen-btn" @click="$emit('speak-text', expectedReadingText)">{{ t('reader.listen') }}</button>
             </div>
 
             <div v-if="hasSpokenText" class="speech-summary-box">
               <div class="speech-summary-copy">
-                <span class="speech-label">Frase transcrita</span>
+                <span class="speech-label">{{ t('reader.transcribedPhrase') }}</span>
                 <strong>{{ spokenText }}</strong>
               </div>
-              <button class="pill-btn listen-btn" @click="$emit('speak-text', spokenText)">Ouvir</button>
+              <button class="pill-btn listen-btn" @click="$emit('speak-text', spokenText)">{{ t('reader.listen') }}</button>
             </div>
           </div>
 
@@ -102,8 +103,8 @@
             </div>
 
             <div class="progress-label">
-              <span>Linha {{ currentLineIndex + 1 }}/{{ currentLines.length || 1 }}</span>
-              <span v-if="readingMode === 'word'">· Palavra {{ currentWordIndex + 1 }}/{{ currentWords.length || 1
+              <span>{{ t('reader.line') }} {{ currentLineIndex + 1 }}/{{ currentLines.length || 1 }}</span>
+              <span v-if="readingMode === 'word'">· {{ t('reader.word') }} {{ currentWordIndex + 1 }}/{{ currentWords.length || 1
                 }}</span>
             </div>
 
@@ -113,58 +114,58 @@
 
             <div class="controls-compact">
               <button class="pill-btn" :class="{ active: currentTextMode === 'original' }"
-                @click="$emit('switch-text-mode', 'original')">Original</button>
+                @click="$emit('switch-text-mode', 'original')">{{ t('reader.original') }}</button>
               <button class="pill-btn" :class="{ active: currentTextMode === 'simplified' }"
-                @click="$emit('switch-text-mode', 'simplified')">Simplificado</button>
+                @click="$emit('switch-text-mode', 'simplified')">{{ t('reader.simplified') }}</button>
               <button v-if="hasSpokenText" class="pill-btn" :class="{ active: currentTextMode === 'spoken' }"
-                @click="$emit('switch-text-mode', 'spoken')">Falado</button>
+                @click="$emit('switch-text-mode', 'spoken')">{{ t('reader.spoken') }}</button>
               <button class="pill-btn" :class="{ active: showSyllables }"
-                @click="$emit('toggle-syllables')">Sílabas</button>
+                @click="$emit('toggle-syllables')">{{ t('reader.syllables') }}</button>
               <button class="pill-btn" :class="{ active: readingMode === 'line' }"
-                @click="$emit('set-reading-mode', 'line')">Linha</button>
+                @click="$emit('set-reading-mode', 'line')">{{ t('reader.line') }}</button>
               <button class="pill-btn" :class="{ active: readingMode === 'word' }"
-                @click="$emit('set-reading-mode', 'word')">Palavra</button>
+                @click="$emit('set-reading-mode', 'word')">{{ t('reader.word') }}</button>
               <button class="pill-btn" :class="{ active: wordAudioMode === 'audio' }"
-                @click="$emit('set-word-audio-mode', wordAudioMode === 'audio' ? 'silent' : 'audio')">Som</button>
+                @click="$emit('set-word-audio-mode', wordAudioMode === 'audio' ? 'silent' : 'audio')">{{ t('reader.sound') }}</button>
 
               <button v-if="readingMode === 'line'" class="pill-btn" :class="{ active: linePlaybackMode === 'single' }"
-                @click="$emit('update:linePlaybackMode', 'single')">Linha única</button>
+                @click="$emit('update:linePlaybackMode', 'single')">{{ t('reader.singleLine') }}</button>
               <button v-if="readingMode === 'line'" class="pill-btn"
                 :class="{ active: linePlaybackMode === 'continuous' }" @click="$emit('update:linePlaybackMode', 'continuous')">
-                {{ isSpeakingLine && linePlaybackMode === 'continuous' ? 'A ler até ao fim' : 'Até ao fim' }}
+                {{ isSpeakingLine && linePlaybackMode === 'continuous' ? t('reader.readingToEnd') : t('reader.toEnd') }}
               </button>
 
-              <button class="pill-btn" @click="$emit('restart-reading')">Reiniciar</button>
-              <button class="pill-btn" @click="$emit('stop-all-audio')">Parar</button>
+              <button class="pill-btn" @click="$emit('restart-reading')">{{ t('reader.restart') }}</button>
+              <button class="pill-btn" @click="$emit('stop-all-audio')">{{ t('reader.stop') }}</button>
             </div>
 
             <div class="settings-panel">
               <div class="setting-block">
-                <label>Fonte {{ fontSize }}</label>
+                <label>{{ t('reader.font') }} {{ fontSize }}</label>
                 <input :value="fontSize" type="range" min="14" max="24"
                   @input="$emit('update:fontSize', Number($event.target.value))" />
               </div>
 
               <div class="setting-block">
-                <label>Velocidade {{ speechRate.toFixed(2) }}</label>
+                <label>{{ t('reader.speed') }} {{ speechRate.toFixed(2) }}</label>
                 <input :value="speechRate" type="range" min="0.6" max="1.8" step="0.05"
                   @input="$emit('update:speechRate', Number($event.target.value))" />
               </div>
 
               <div class="setting-block">
-                <label>Cores de leitura</label>
+                <label>{{ t('reader.colors') }}</label>
                 <select :value="readingPalette" @change="$emit('update:readingPalette', $event.target.value)">
-                  <option value="yellow">Amarelo</option>
-                  <option value="blue">Azul</option>
-                  <option value="green">Verde</option>
-                  <option value="pink">Rosa suave</option>
+                  <option value="yellow">{{ t('reader.yellow') }}</option>
+                  <option value="blue">{{ t('reader.blue') }}</option>
+                  <option value="green">{{ t('reader.green') }}</option>
+                  <option value="pink">{{ t('reader.pink') }}</option>
                 </select>
               </div>
 
               <label v-if="readingMode === 'word'" class="check-block">
                 <input :checked="autoAdvanceLine" type="checkbox"
                   @change="$emit('update:autoAdvanceLine', $event.target.checked)" />
-                Passar à linha seguinte
+                {{ t('reader.nextLine') }}
               </label>
             </div>
           </div>
@@ -180,6 +181,8 @@
 import { computed } from 'vue'
 import AppHeader from '../components/common/AppHeader.vue'
 import BottomNav from '../components/common/BottomNav.vue'
+import LanguageToggle from '../components/common/LanguageToggle.vue'
+import { t } from '../i18n'
 
 const props = defineProps({
   activeFlow: {

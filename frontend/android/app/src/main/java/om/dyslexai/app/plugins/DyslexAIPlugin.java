@@ -113,6 +113,7 @@ public class DyslexAIPlugin extends Plugin {
     @PluginMethod
     public void processText(PluginCall call) {
         String text = call.getString("text");
+        String locale = normalizeLocale(call.getString("locale", "pt"));
 
         Log.i(TAG, "processText() chamado. text length=" + (text == null ? 0 : text.length()));
 
@@ -125,7 +126,7 @@ public class DyslexAIPlugin extends Plugin {
         executor.execute(() -> {
             try {
                 Log.i(TAG, "processText() -> a enviar para o engine...");
-                JSObject result = engine.processText(getContext(), text);
+                JSObject result = engine.processText(getContext(), text, locale);
                 Log.i(TAG, "processText() -> concluído com sucesso.");
                 call.resolve(result);
             } catch (Exception e) {
@@ -175,6 +176,7 @@ public void prepareImage(PluginCall call) {
     public void processImage(PluginCall call) {
         String imageBase64 = call.getString("imageBase64");
         String mimeType = call.getString("mimeType", "image/jpeg");
+        String locale = normalizeLocale(call.getString("locale", "pt"));
 
         Log.i(TAG, "processImage() chamado. mimeType=" + mimeType +
                 ", base64 length=" + (imageBase64 == null ? 0 : imageBase64.length()));
@@ -188,7 +190,7 @@ public void prepareImage(PluginCall call) {
         executor.execute(() -> {
             try {
                 Log.i(TAG, "processImage() -> a enviar para o engine...");
-                JSObject result = engine.processImage(getContext(), imageBase64, mimeType);
+                JSObject result = engine.processImage(getContext(), imageBase64, mimeType, locale);
                 Log.i(TAG, "processImage() -> concluído com sucesso.");
                 call.resolve(result);
             } catch (Exception e) {
@@ -203,6 +205,7 @@ public void prepareImage(PluginCall call) {
         String ageGroup = call.getString("ageGroup", "8-10");
         String level = call.getString("level", "1");
         String type = call.getString("type", "simple_sentence");
+        String locale = normalizeLocale(call.getString("locale", "pt"));
 
         Log.i(TAG, "generateReadingPhrase() chamado. ageGroup=" + ageGroup +
                 ", level=" + level + ", type=" + type);
@@ -210,7 +213,7 @@ public void prepareImage(PluginCall call) {
         executor.execute(() -> {
             try {
                 Log.i(TAG, "generateReadingPhrase() -> a enviar para o engine...");
-                JSObject result = engine.generateReadingPhrase(getContext(), ageGroup, level, type);
+                JSObject result = engine.generateReadingPhrase(getContext(), ageGroup, level, type, locale);
                 Log.i(TAG, "generateReadingPhrase() -> concluído com sucesso.");
                 call.resolve(result);
             } catch (Exception e) {
@@ -225,6 +228,7 @@ public void prepareImage(PluginCall call) {
         String audioBase64 = call.getString("audioBase64");
         String mimeType = call.getString("mimeType", "audio/webm");
         String expectedText = call.getString("expectedText");
+        String locale = normalizeLocale(call.getString("locale", "pt"));
 
         Log.i(TAG, "processAudio() chamado. mimeType=" + mimeType +
                 ", audio base64 length=" + (audioBase64 == null ? 0 : audioBase64.length()) +
@@ -239,7 +243,7 @@ public void prepareImage(PluginCall call) {
         executor.execute(() -> {
             try {
                 Log.i(TAG, "processAudio() -> a enviar para o engine...");
-                JSObject result = engine.processAudio(getContext(), audioBase64, mimeType, expectedText);
+                JSObject result = engine.processAudio(getContext(), audioBase64, mimeType, expectedText, locale);
                 Log.i(TAG, "processAudio() -> concluído com sucesso.");
                 call.resolve(result);
             } catch (Exception e) {
@@ -248,10 +252,16 @@ public void prepareImage(PluginCall call) {
             }
         });
     }
+
+    private String normalizeLocale(String value) {
+        return value != null && value.toLowerCase(Locale.US).startsWith("en") ? "en" : "pt";
+    }
+
     @PluginMethod
     public void speak(PluginCall call) {
         String text = call.getString("text", "");
         Double rateValue = call.getDouble("rate", 1.0);
+        String locale = normalizeLocale(call.getString("locale", "pt"));
 
         if (text == null || text.trim().isEmpty()) {
             call.reject("Texto vazio para leitura.");
@@ -278,6 +288,7 @@ public void prepareImage(PluginCall call) {
 
                 textToSpeech.setSpeechRate(rate);
                 textToSpeech.setPitch(1.0f);
+                textToSpeech.setLanguage("en".equals(locale) ? Locale.US : new Locale("pt", "PT"));
 
                 Bundle params = new Bundle();
                 int result = textToSpeech.speak(text, TextToSpeech.QUEUE_FLUSH, params, utteranceId);

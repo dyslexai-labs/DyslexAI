@@ -1,15 +1,15 @@
 <template>
   <section class="flow-view image-source-view">
     <div class="flow-shell image-source-shell">
-      <AppHeader subtitle="Leitura assistida" @home="$emit('go-home')" />
+      <AppHeader :subtitle="t('app.assisted')" @home="$emit('go-home')" />
 
       <div class="flow-main image-source-main">
         <section class="flow-intro image-source-intro">
-          <h1>Escolhe a origem da imagem</h1>
-          <p>Tira uma fotografia da página ou escolhe uma imagem guardada.</p>
+          <h1>{{ t('imageSource.title') }}</h1>
+          <p>{{ t('imageSource.description') }}</p>
         </section>
 
-        <section class="flow-options image-source-options" aria-label="Origem da imagem">
+        <section class="flow-options image-source-options" :aria-label="t('imageSource.label')">
           <button class="flow-option flow-option-blue" @click="$emit('take-photo')">
             <div class="flow-option-icon" aria-hidden="true">
               <svg viewBox="0 0 96 96" role="img" focusable="false">
@@ -21,7 +21,7 @@
                 <path d="M18 73l17-18 13 14 9-9 19 13" fill="none" stroke="#34a853" stroke-width="5" stroke-linecap="round" stroke-linejoin="round"/>
               </svg>
             </div>
-            <div class="flow-option-text"><strong>Tirar fotografia</strong><span>Usa a câmara para fotografar a página.</span></div>
+            <div class="flow-option-text"><strong>{{ t('imageSource.cameraTitle') }}</strong><span>{{ t('imageSource.cameraDescription') }}</span></div>
             <div class="flow-option-arrow" aria-hidden="true">&gt;</div>
           </button>
 
@@ -35,7 +35,7 @@
                 <path d="M27 72l23-28 22 28" fill="#1a73e8" opacity=".78"/>
               </svg>
             </div>
-            <div class="flow-option-text"><strong>Escolher da galeria</strong><span>Escolhe uma imagem já guardada.</span></div>
+            <div class="flow-option-text"><strong>{{ t('imageSource.galleryTitle') }}</strong><span>{{ t('imageSource.galleryDescription') }}</span></div>
             <div class="flow-option-arrow" aria-hidden="true">&gt;</div>
           </button>
         </section>
@@ -49,6 +49,7 @@
 <script setup>
 import AppHeader from '../components/common/AppHeader.vue'
 import BottomNav from '../components/common/BottomNav.vue'
+import { t } from '../i18n'
 
 defineEmits(['take-photo', 'pick-gallery', 'go-home'])
 </script>
