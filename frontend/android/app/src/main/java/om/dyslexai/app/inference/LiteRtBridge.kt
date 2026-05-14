@@ -14,6 +14,7 @@ object LiteRtBridge {
     private const val TAG = "LiteRtBridge"
     private const val ENGINE_MAX_TOKENS = 2048
 
+    // Creates the LiteRT-LM engine with a safe CPU fallback for devices that reject the main GPU backend.
     @JvmStatic
     fun createEngine(modelPath: String, cacheDir: String, enableVision: Boolean, useMainGpu: Boolean): Engine {
         if (!useMainGpu) {
@@ -56,6 +57,7 @@ object LiteRtBridge {
         }
     }
 
+    // Applies the final backend configuration shared by text, image and audio inference.
     private fun createEngineWithBackend(
         modelPath: String,
         cacheDir: String,
@@ -81,6 +83,7 @@ object LiteRtBridge {
         return Engine(engineConfig).also { it.initialize() }
     }
 
+    // Runs a text-only conversation and returns the extracted text response.
     @JvmStatic
     fun runText(engine: Engine, prompt: String): String {
         val conversation = createConversation(
@@ -100,6 +103,7 @@ object LiteRtBridge {
         }
     }
 
+    // Runs a multimodal conversation with one image file plus the prompt.
     @JvmStatic
     fun runImage(engine: Engine, imagePath: String, prompt: String): String {
         val conversation = createConversation(
@@ -124,6 +128,7 @@ object LiteRtBridge {
         }
     }
 
+    // Runs audio inference from a WAV file persisted by the Java runtime.
     @JvmStatic
     fun runAudioFile(engine: Engine, audioPath: String, prompt: String): String {
         val conversation = createConversation(
@@ -152,6 +157,7 @@ object LiteRtBridge {
         }
     }
 
+    // Builds short-lived conversations so each request starts with a clean context.
     private fun createConversation(
         engine: Engine,
         systemInstruction: String,
@@ -178,6 +184,7 @@ object LiteRtBridge {
         return (System.nanoTime() - startNanos) / 1_000_000L
     }
 
+    // Extracts text parts from LiteRT-LM messages while keeping a fallback for unusual responses.
     private fun extractText(message: Message): String {
         val allParts = message.contents.contents
         val textParts = allParts.filterIsInstance<Content.Text>()

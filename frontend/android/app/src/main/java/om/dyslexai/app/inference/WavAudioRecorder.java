@@ -24,6 +24,7 @@ public class WavAudioRecorder {
     private volatile boolean recording = false;
     private ByteArrayOutputStream pcmBuffer;
 
+    // Starts a simple 16 kHz mono PCM recording that is compatible with the local audio runtime.
     public synchronized void start() throws Exception {
         if (recording) {
             Log.w(TAG, "start() chamado mas já estava a gravar.");
@@ -76,6 +77,7 @@ public class WavAudioRecorder {
         Log.i(TAG, "Gravação WAV iniciada: 16 kHz, mono, PCM 16-bit.");
     }
 
+    // Stops recording and wraps the captured PCM samples in a WAV container.
     public synchronized byte[] stopAndGetWavBytes() throws Exception {
         if (!recording && audioRecord == null) {
             throw new Exception("Não existe gravação ativa.");
@@ -121,6 +123,7 @@ public class WavAudioRecorder {
         return recording;
     }
 
+    // Releases native recorder resources without returning audio.
     public synchronized void cancel() {
         recording = false;
 
@@ -142,11 +145,13 @@ public class WavAudioRecorder {
         pcmBuffer = null;
     }
 
+    // Converts the WAV bytes into the data URL shape used by the Vue layer.
     public String toDataUrl(byte[] wavBytes) {
         String base64 = Base64.encodeToString(wavBytes, Base64.NO_WRAP);
         return "data:audio/wav;base64," + base64;
     }
 
+    // Writes a minimal PCM WAV header followed by the captured samples.
     private byte[] buildWavFile(byte[] pcmBytes) throws IOException {
         ByteArrayOutputStream out = new ByteArrayOutputStream();
 

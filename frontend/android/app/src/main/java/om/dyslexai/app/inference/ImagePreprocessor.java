@@ -13,6 +13,7 @@ import java.io.ByteArrayOutputStream;
 public class ImagePreprocessor {
     private static final String TAG = "ImagePreprocessor";
 
+    // Normalizes camera/gallery images before local vision inference.
     public static JSObject prepare(String input, String mode) throws Exception {
         long start = System.currentTimeMillis();
 
@@ -103,6 +104,7 @@ public class ImagePreprocessor {
         return result;
     }
 
+    // Accepts both raw base64 and browser-style data URLs.
     private static byte[] decodeBase64OrDataUrl(String input) {
         String clean = input;
         int commaIndex = input.indexOf(",");
@@ -114,6 +116,7 @@ public class ImagePreprocessor {
         return Base64.decode(clean, Base64.DEFAULT);
     }
 
+    // Chooses a decode sample size that keeps memory use predictable on mobile devices.
     private static int calculateInSampleSize(int width, int height, int maxEdge) {
         int inSampleSize = 1;
         int largest = Math.max(width, height);
@@ -125,6 +128,7 @@ public class ImagePreprocessor {
         return Math.max(1, inSampleSize);
     }
 
+    // Finds the useful non-white area so photographed documents waste less model context.
     private static Rect detectUsefulCrop(Bitmap bitmap) {
         int width = bitmap.getWidth();
         int height = bitmap.getHeight();
@@ -170,6 +174,7 @@ public class ImagePreprocessor {
         return new Rect(x, y, Math.max(1, right - x), Math.max(1, bottom - y));
     }
 
+    // Resizes the image only when it exceeds the selected mode limit.
     private static Bitmap resizeToMaxEdge(Bitmap source, int maxEdge) {
         int width = source.getWidth();
         int height = source.getHeight();
@@ -187,6 +192,7 @@ public class ImagePreprocessor {
         return Bitmap.createScaledBitmap(source, targetWidth, targetHeight, true);
     }
 
+    // Applies a light contrast/brightness pass to improve OCR-like vision results.
     private static Bitmap enhanceContrast(Bitmap source, float contrast, float brightness) {
         int width = source.getWidth();
         int height = source.getHeight();

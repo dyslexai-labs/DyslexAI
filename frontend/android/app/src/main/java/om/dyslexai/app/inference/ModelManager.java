@@ -30,6 +30,7 @@ public class ModelManager {
         void onProgress(JSObject progress);
     }
 
+    // Returns the current model installation state using the same payload shape sent to the UI.
     public JSObject getState(Context context) {
         File modelFile = getInstalledModelFile(context);
         long size = modelFile.exists() ? modelFile.length() : 0L;
@@ -49,14 +50,17 @@ public class ModelManager {
         return state;
     }
 
+    // Checks whether a valid Gemma 4 LiteRT-LM file is already available on this device.
     public boolean isModelInstalled(Context context) {
         return isValidModelFile(getInstalledModelFile(context));
     }
 
+    // Resolves the path that the local runtime should open.
     public String resolveModelPath(Context context) {
         return getInstalledModelFile(context).getAbsolutePath();
     }
 
+    // Installs the model when missing and emits progress updates for the preparation screen.
     public JSObject ensureInstalled(Context context, ProgressCallback callback) throws Exception {
         if (isModelInstalled(context)) {
             JSObject installed = getState(context);
@@ -84,8 +88,8 @@ public class ModelManager {
         return installed;
     }
 
+    // Downloads to a partial file first so interrupted installs never look valid to the runtime.
     private void downloadModel(Context context, ProgressCallback callback) throws Exception {
-        // Downloads to a partial file first so interrupted installs never look valid to the runtime.
         File modelFile = getDownloadTargetFile(context);
         File parentDir = modelFile.getParentFile();
         if (parentDir == null) {
@@ -172,9 +176,8 @@ public class ModelManager {
         }
     }
 
+    // Keeps the original developer path when it is available, with app-private storage as fallback.
     private File getInstalledModelFile(Context context) {
-        // Keep the original developer path when it is available, but support normal APK installs
-        // by falling back to app-private storage on devices where /data/local/tmp is not writable.
         File preferredModel = new File(MODEL_PATH);
         if (isValidModelFile(preferredModel)) {
             return preferredModel;
@@ -183,6 +186,7 @@ public class ModelManager {
         return getAppModelFile(context);
     }
 
+    // Chooses a writable target for automatic downloads on normal user devices.
     private File getDownloadTargetFile(Context context) {
         File preferredModel = new File(MODEL_PATH);
         File preferredParent = preferredModel.getParentFile();
@@ -201,6 +205,7 @@ public class ModelManager {
         return modelFile.exists() && modelFile.isFile() && modelFile.length() >= MIN_VALID_MODEL_BYTES;
     }
 
+    // Builds a progress payload with bytes, MB and percentage for the Vue setup screen.
     private JSObject progress(String status, long downloaded, long total, String path, String message) {
         int percent = total > 0 ? (int) Math.min(100L, Math.max(0L, (downloaded * 100L) / total)) : 0;
 

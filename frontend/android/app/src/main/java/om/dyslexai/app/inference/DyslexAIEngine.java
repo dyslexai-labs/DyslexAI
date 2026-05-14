@@ -33,6 +33,7 @@ public class DyslexAIEngine {
         this.runtime = runtime;
     }
 
+    // Reports the current local runtime status to the Capacitor layer.
     public JSObject health() {
         JSObject ret = new JSObject();
         ret.put("success", true);
@@ -44,6 +45,7 @@ public class DyslexAIEngine {
         return ret;
     }
 
+    // Exposes the features supported by the current on-device runtime.
     public JSObject getCapabilities() {
         JSObject ret = new JSObject();
         ret.put("text", true);
@@ -58,14 +60,17 @@ public class DyslexAIEngine {
         return ret;
     }
 
+    // Explicitly initializes the local runtime when the model gate finishes.
     public void initialize(Context context) throws Exception {
         ensureRuntime(context);
     }
 
+    // Backward-compatible text entry point; Portuguese remains the default locale.
     public JSObject processText(Context context, String text) throws Exception {
         return processText(context, text, "pt");
     }
 
+    // Simplifies user text through the local Gemma runtime and returns the stable frontend schema.
     public JSObject processText(Context context, String text, String locale) throws Exception {
         ensureRuntime(context);
 
@@ -91,10 +96,12 @@ public class DyslexAIEngine {
         return buildResult(text, simplified, locale);
     }
 
+    // Backward-compatible image entry point; Portuguese remains the default locale.
     public JSObject processImage(Context context, String imageBase64, String mimeType) throws Exception {
         return processImage(context, imageBase64, mimeType, "pt");
     }
 
+    // Sends one multimodal image request to the local runtime and normalizes the model response.
     public JSObject processImage(Context context, String imageBase64, String mimeType, String locale) throws Exception {
         long totalStart = System.nanoTime();
         ensureRuntime(context);
@@ -136,10 +143,12 @@ public class DyslexAIEngine {
         return result;
     }
 
+    // Backward-compatible reading phrase entry point; Portuguese remains the default locale.
     public JSObject generateReadingPhrase(Context context, String ageGroup, String level, String type) throws Exception {
         return generateReadingPhrase(context, ageGroup, level, type, "pt");
     }
 
+    // Generates a short guided-reading sentence while preserving the frontend response contract.
     public JSObject generateReadingPhrase(Context context, String ageGroup, String level, String type, String locale) throws Exception {
         ensureRuntime(context);
 
@@ -172,10 +181,12 @@ public class DyslexAIEngine {
         return result;
     }
 
+    // Backward-compatible audio entry point; Portuguese remains the default locale.
     public JSObject processAudio(Context context, String audioBase64, String mimeType, String expectedText) throws Exception {
         return processAudio(context, audioBase64, mimeType, expectedText, "pt");
     }
 
+    // Transcribes the child's recording first, then asks Gemma for reading feedback against the expected text.
     public JSObject processAudio(Context context, String audioBase64, String mimeType, String expectedText, String locale) throws Exception {
         ensureRuntime(context);
 
@@ -263,7 +274,7 @@ public class DyslexAIEngine {
 
         JSArray issues = extractIssues(feedbackParsed);
 
-        // Compatibilidade com o frontend atual: o botão “Ouvir comentário” pode continuar a ler estes campos.
+        // Keeps the current frontend contract: the "listen to comment" button can keep reading these fields.
         String comparisonSummary = feedbackComment;
         String positiveFeedback = "";
         String improvementTip = "";
@@ -276,6 +287,7 @@ public class DyslexAIEngine {
         Log.i(TAG, "processAudio() -> feedback_comment=" + feedbackComment);
         Log.i(TAG, "processAudio() -> issues count=" + issues.length());
 
+        // Return both normalized fields and raw model outputs so the UI can stay stable while debugging remains possible.
         JSObject result = new JSObject();
         result.put("success", true);
         result.put("transcription", transcription);
@@ -306,6 +318,7 @@ public class DyslexAIEngine {
     }
 
     private String buildAudioTranscriptionOnlyPrompt() {
+        // Portuguese prompt intentionally preserved as the default behavior.
         return "Transcreve o áudio em português europeu.\n" +
                 "Regras obrigatórias:\n" +
                 "- Escreve apenas o que foi dito no áudio.\n" +
@@ -318,6 +331,7 @@ public class DyslexAIEngine {
     }
 
     private String buildAudioTranscriptionOnlyPromptEn() {
+        // English prompt mirrors the Portuguese contract and keeps the same JSON field names.
         return "Transcribe the audio in English.\n" +
                 "Mandatory rules:\n" +
                 "- Write only what was said in the audio.\n" +
@@ -333,6 +347,7 @@ public class DyslexAIEngine {
         String expected = safe(expectedText, "");
         String spoken = safe(spokenTranscription, "");
 
+        // Portuguese prompt intentionally preserved as the default reading-feedback behavior.
         return "És um assistente de leitura para crianças com dislexia.\n" +
                 "Vais comparar duas frases já escritas.\n" +
                 "Responde sempre em português de Portugal. Usa sempre 'tu' e nunca 'você'.\n\n" +
@@ -407,6 +422,7 @@ public class DyslexAIEngine {
         String expected = safe(expectedText, "");
         String spoken = safe(spokenTranscription, "");
 
+        // English prompt uses the same output schema as Portuguese to avoid frontend branching.
         return "You are a reading assistant for children with dyslexia.\n" +
                 "You will compare two already-written sentences.\n" +
                 "Always reply in English. Use simple child-friendly language.\n\n" +
@@ -462,6 +478,7 @@ public class DyslexAIEngine {
                 "}";
     }
 
+    // Extracts plain speech text when the model returns text instead of the requested JSON object.
     private String extractLikelyPlainTranscription(String raw) {
         String text = cleanModelText(raw);
         JSObject parsed = parseModelJson(text);
@@ -483,6 +500,7 @@ public class DyslexAIEngine {
         return cleanModelText(text);
     }
 
+    // Removes common markdown/JSON wrapping without changing the model's semantic content.
     private String cleanModelText(String value) {
         String text = safe(value, "").trim();
         text = text
@@ -501,6 +519,7 @@ public class DyslexAIEngine {
         return text.replaceAll("\\s+", " ").trim();
     }
 
+    // Provides a controlled audio result if LiteRT-LM cannot decode or infer from the recording.
     private JSObject buildAudioDecodeFallbackResult(String expectedText, String mimeType, int audioBytesLength, Exception error, String locale) {
         String fallbackText = safe(expectedText, "");
         boolean english = isEnglish(locale);
@@ -547,6 +566,7 @@ public class DyslexAIEngine {
         return result;
     }
 
+    // Avoids sending clearly silent recordings to the audio model, which can otherwise stall on some devices.
     private JSObject buildAudioNoSpeechResult(String expectedText, String mimeType, int audioBytesLength, AudioSignalInfo signalInfo, String locale) {
         String expected = safe(expectedText, "");
         boolean english = isEnglish(locale);
@@ -585,6 +605,7 @@ public class DyslexAIEngine {
         return result;
     }
 
+    // Reads basic WAV signal levels to detect recordings with no likely speech.
     private AudioSignalInfo inspectWavSignal(byte[] wavBytes) {
         if (wavBytes == null || wavBytes.length < 44) {
             return null;
@@ -673,6 +694,7 @@ public class DyslexAIEngine {
         }
     }
 
+    // Parses JSON returned by Gemma, with a text fallback for imperfect model output.
     private JSObject parseModelJson(String raw) {
         String text = safe(raw, "").trim();
 
@@ -702,6 +724,7 @@ public class DyslexAIEngine {
         return fallback;
     }
 
+    // Normalizes the issues field because model output can be an array, JSON array, or plain text.
     private JSArray extractIssues(JSObject parsed) {
         JSArray issues = new JSArray();
 
@@ -731,12 +754,13 @@ public class DyslexAIEngine {
                 }
             }
         } catch (Exception ignored) {
-            // mantém lista vazia
+            // Keep an empty list when the model returns an unexpected issue format.
         }
 
         return issues;
     }
 
+    // Initializes the runtime lazily so the app can open before the heavy LiteRT engine is ready.
     private void ensureRuntime(Context context) throws Exception {
         if (!runtime.isReady()) {
             // Lazy initialization keeps the Capacitor bridge responsive during startup.
@@ -748,6 +772,7 @@ public class DyslexAIEngine {
         }
     }
 
+    // Builds the common text/image result shape consumed by the Vue reader screen.
     private JSObject buildResult(String originalText, String simplifiedText) {
         return buildResult(originalText, simplifiedText, "pt");
     }
@@ -773,6 +798,7 @@ public class DyslexAIEngine {
         return result;
     }
 
+    // Keeps large images within the size range that works reliably for local multimodal inference.
     private byte[] optimizeImageBytesForInference(byte[] imageBytes) {
         if (imageBytes == null || imageBytes.length == 0) {
             return imageBytes == null ? new byte[0] : imageBytes;
@@ -845,6 +871,7 @@ public class DyslexAIEngine {
         return (System.nanoTime() - startNanos) / 1_000_000L;
     }
 
+    // Accepts raw base64 or data URLs from the Capacitor/Vue layer.
     private byte[] decodeBase64Payload(String base64Payload) {
         String normalized = base64Payload == null ? "" : base64Payload.trim();
         int commaIndex = normalized.indexOf(',');
@@ -857,20 +884,24 @@ public class DyslexAIEngine {
         return decoded;
     }
 
+    // Legacy OCR-only prompt kept for compatibility with older image flows.
     private String buildImageExtractionPrompt() {
         return "Extrai só o texto visível. Mantém a ordem. Devolve só o texto.";
     }
 
+    // Portuguese simplification prompt preserved for the default app behavior.
     private String buildSimplificationPrompt(String text) {
         return "Simplifica em português europeu. Usa frases curtas e palavras simples. Devolve só o texto final.\n\n"
                 + text;
     }
 
+    // English simplification prompt selected only when the UI locale is English.
     private String buildSimplificationPromptEn(String text) {
         return "Simplify in English for a dyslexic reader. Use short sentences and simple words. Return only the final text.\n\n"
                 + text;
     }
 
+    // Portuguese reading prompt preserved for the guided-reading flow.
     private String buildReadingPhrasePrompt(String ageGroup, String level, String type) {
         return "You are an educational assistant for dyslexic students.\n\n" +
                 "Generate one reading sentence in European Portuguese for a child.\n\n" +
@@ -892,6 +923,7 @@ public class DyslexAIEngine {
                 "}";
     }
 
+    // English reading prompt mirrors the Portuguese schema so the UI does not branch.
     private String buildReadingPhrasePromptEn(String ageGroup, String level, String type) {
         return "You are an educational assistant for dyslexic students.\n\n" +
                 "Generate one reading sentence in English for a child.\n\n" +
@@ -913,6 +945,7 @@ public class DyslexAIEngine {
                 "}";
     }
 
+    // Parses generated reading phrases and fills safe defaults if Gemma returns partial JSON.
     private JSObject parseGeneratedPhrase(String raw, String ageGroup, String level, String type) throws Exception {
         JSObject result = new JSObject();
 
@@ -979,6 +1012,7 @@ public class DyslexAIEngine {
         return array;
     }
 
+    // Parses the preferred one-pass image JSON result.
     private JSObject parseImageFullResult(String raw) throws Exception {
         try {
             JSONObject obj = new JSONObject(raw);
@@ -1049,6 +1083,7 @@ public class DyslexAIEngine {
         }
     }
 
+    // Supports legacy labeled image responses such as ORIGINAL/SIMPLIFICADO.
     private JSObject parseImageLabeledResult(String raw) {
         String text = cleanModelText(raw);
         if (text.trim().isEmpty()) return null;
@@ -1090,6 +1125,7 @@ public class DyslexAIEngine {
         return result;
     }
 
+    // Last-resort recovery for image results that contain JSON-like fragments.
     private JSObject recoverImageFullResult(String raw) {
         String originalText = extractJsonLikeString(raw, "original_text");
         String simplifiedText = extractJsonLikeString(raw, "simplified_text");
@@ -1178,6 +1214,7 @@ public class DyslexAIEngine {
         return cleanModelText(value.toString());
     }
 
+    // Portuguese multimodal image prompt preserved for the default image flow.
     private String buildImageFullPrompt() {
         return "Transcreve o texto visível na imagem e cria uma versão simplificada para dislexia em português europeu.\n" +
                 "Responde só neste formato curto:\n" +
@@ -1185,6 +1222,7 @@ public class DyslexAIEngine {
                 "SIMPLIFICADO: texto simplificado";
     }
 
+    // English multimodal image prompt selected only when the UI locale is English.
     private String buildImageFullPromptEn() {
         return "Transcribe the visible text in the image and create a simplified version for dyslexia in English.\n" +
                 "Reply only with valid JSON, without markdown.\n" +

@@ -46,6 +46,7 @@ public class DyslexAIPlugin extends Plugin {
     private final ExecutorService executor = Executors.newSingleThreadExecutor();
     private final WavAudioRecorder wavAudioRecorder = new WavAudioRecorder();
 
+    // Creates the stable Android bridge: Capacitor plugin -> DyslexAIEngine -> local runtime.
     @Override
     public void load() {
         Log.i(TAG, "load() -> a carregar plugin DyslexAI...");
@@ -56,24 +57,28 @@ public class DyslexAIPlugin extends Plugin {
         Log.i(TAG, "load() -> engine criado com sucesso.");
     }
 
+    // Lightweight readiness endpoint used by the frontend service.
     @PluginMethod
     public void health(PluginCall call) {
         Log.i(TAG, "health() chamado.");
         call.resolve(engine.health());
     }
 
+    // Exposes supported local inference modes to the Vue layer.
     @PluginMethod
     public void getCapabilities(PluginCall call) {
         Log.i(TAG, "getCapabilities() chamado.");
         call.resolve(engine.getCapabilities());
     }
 
+    // Lets the preparation screen check whether the model is already installed.
     @PluginMethod
     public void getModelState(PluginCall call) {
         Log.i(TAG, "getModelState() chamado.");
         call.resolve(modelManager.getState(getContext()));
     }
 
+    // Downloads the model when needed, starts the runtime and reports progress to Vue listeners.
     @PluginMethod
     public void ensureModelReady(PluginCall call) {
         Log.i(TAG, "ensureModelReady() chamado.");
@@ -111,6 +116,7 @@ public class DyslexAIPlugin extends Plugin {
         });
     }
 
+    // Simplifies text locally while keeping Portuguese as the default locale.
     @PluginMethod
     public void processText(PluginCall call) {
         String text = call.getString("text");
@@ -136,6 +142,7 @@ public class DyslexAIPlugin extends Plugin {
             }
         });
     }
+// Prepares camera/gallery images before they are sent to multimodal inference.
 @PluginMethod
 public void prepareImage(PluginCall call) {
     String imageBase64 = call.getString("imageBase64");
@@ -174,6 +181,7 @@ public void prepareImage(PluginCall call) {
     });
 }
 
+    // Sends an already prepared image to the local multimodal runtime.
     @PluginMethod
     public void processImage(PluginCall call) {
         String imageBase64 = call.getString("imageBase64");
@@ -202,6 +210,7 @@ public void prepareImage(PluginCall call) {
         });
     }
 
+    // Generates the guided-reading phrase used by the audio exercise.
     @PluginMethod
     public void generateReadingPhrase(PluginCall call) {
         String ageGroup = call.getString("ageGroup", "8-10");
@@ -225,6 +234,7 @@ public void prepareImage(PluginCall call) {
         });
     }
 
+    // Sends a recorded reading attempt to the local audio/text feedback pipeline.
     @PluginMethod
     public void processAudio(PluginCall call) {
         String audioBase64 = call.getString("audioBase64");
@@ -256,10 +266,12 @@ public void prepareImage(PluginCall call) {
         });
     }
 
+    // Keeps locale handling intentionally small: English opt-in, Portuguese otherwise.
     private String normalizeLocale(String value) {
         return value != null && value.toLowerCase(Locale.US).startsWith("en") ? "en" : "pt";
     }
 
+    // Uses Android TextToSpeech for reader/audio feedback playback.
     @PluginMethod
     public void speak(PluginCall call) {
         String text = call.getString("text", "");
@@ -311,6 +323,7 @@ public void prepareImage(PluginCall call) {
         });
     }
 
+    // Stops any active Android TextToSpeech utterance and resolves pending calls.
     @PluginMethod
     public void stopSpeaking(PluginCall call) {
         getActivity().runOnUiThread(() -> {
@@ -326,6 +339,7 @@ public void prepareImage(PluginCall call) {
         });
     }
 
+    // Initializes the platform TTS engine once and resolves speak() calls through callbacks.
     private void initTextToSpeech() {
         try {
             textToSpeech = new TextToSpeech(getContext(), status -> {
@@ -381,6 +395,7 @@ public void prepareImage(PluginCall call) {
             resolvePendingTtsCall(utteranceId, status);
         }
     }
+	// Starts native WAV recording after microphone permission is available.
 	@PluginMethod
 	public void startWavRecording(PluginCall call) {
 	    Log.i(TAG, "startWavRecording() chamado.");
@@ -410,6 +425,7 @@ public void prepareImage(PluginCall call) {
 	    });
 	}
 
+    // Continues startWavRecording() after Android permission resolution.
     @PermissionCallback
     private void startWavRecordingPermissionCallback(PluginCall call) {
         if (getPermissionState(MICROPHONE_PERMISSION) != PermissionState.GRANTED) {
@@ -421,6 +437,7 @@ public void prepareImage(PluginCall call) {
         startWavRecording(call);
     }
 
+// Stops native WAV recording and returns a data URL to the Vue layer.
 @PluginMethod
 public void stopWavRecording(PluginCall call) {
     Log.i(TAG, "stopWavRecording() chamado.");

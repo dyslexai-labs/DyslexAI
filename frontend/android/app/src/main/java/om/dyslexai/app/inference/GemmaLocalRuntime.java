@@ -25,6 +25,7 @@ public class GemmaLocalRuntime implements LocalModelRuntime {
 
     private com.google.ai.edge.litertlm.Engine engine;
 
+    // Opens the Gemma 4 LiteRT-LM file and initializes the LiteRT engine once per app process.
     @Override
     public synchronized void initialize(Context context) throws Exception {
         if (initialized) return;
@@ -66,11 +67,13 @@ public class GemmaLocalRuntime implements LocalModelRuntime {
         Log.i(TAG, "Engine inicializada com sucesso. initMs=" + elapsedMs(start));
     }
 
+    // Reports whether the native LiteRT engine has already been initialized.
     @Override
     public boolean isReady() {
         return initialized;
     }
 
+    // Runs text-only inference through the local model.
     @Override
     public String inferText(String prompt) throws Exception {
         if (!initialized) {
@@ -87,6 +90,7 @@ public class GemmaLocalRuntime implements LocalModelRuntime {
         return response;
     }
 
+    // Persists the image temporarily because LiteRT-LM expects image file content.
     @Override
     public String inferImage(byte[] imageBytes, String mimeType, String prompt) throws Exception {
         if (!initialized) {
@@ -109,6 +113,7 @@ public class GemmaLocalRuntime implements LocalModelRuntime {
         return response;
     }
 
+    // Persists the recording temporarily because LiteRT-LM expects audio file content.
     @Override
     public String inferAudio(byte[] audioBytes, String mimeType, String prompt) throws Exception {
         if (!initialized) {
@@ -133,11 +138,13 @@ public class GemmaLocalRuntime implements LocalModelRuntime {
         return response;
     }
 
+    // Stable runtime identifier returned to the frontend and metadata payloads.
     @Override
     public String getName() {
         return "gemma-4-e4b-litert-lm-local";
     }
 
+    // Detects whether a previous GPU probe likely crashed before Java could catch an exception.
     private void reconcilePendingGpuProbe(SharedPreferences prefs) {
         // Native GPU failures can kill the process before Java receives an exception.
         // A pending probe on the next launch means the main LLM backend should fall back to CPU.
@@ -163,6 +170,7 @@ public class GemmaLocalRuntime implements LocalModelRuntime {
         }
     }
 
+    // Uses the main GPU only when this device has not previously failed the probe.
     private boolean shouldUseMainGpu(SharedPreferences prefs) {
         if (prefs.getBoolean(KEY_MAIN_GPU_CRASHED, false)) {
             return false;
@@ -175,6 +183,7 @@ public class GemmaLocalRuntime implements LocalModelRuntime {
         return true;
     }
 
+    // Marks the start of a risky GPU initialization attempt.
     private void markGpuProbeStartedIfNeeded(SharedPreferences prefs, boolean useMainGpu) {
         if (!useMainGpu) return;
 
@@ -186,6 +195,7 @@ public class GemmaLocalRuntime implements LocalModelRuntime {
         Log.i(TAG, "GPU policy -> probe GPU iniciado. Se a app morrer agora, o próximo arranque usará CPU principal.");
     }
 
+    // Records that the main GPU backend initialized successfully on this device.
     private void markGpuProbeSucceededIfNeeded(SharedPreferences prefs, boolean useMainGpu) {
         if (!useMainGpu) return;
 
@@ -199,6 +209,7 @@ public class GemmaLocalRuntime implements LocalModelRuntime {
         Log.i(TAG, "GPU policy -> GPU principal validado para este dispositivo.");
     }
 
+    // Records a recoverable GPU initialization failure and forces future CPU fallback.
     private void markGpuProbeFailedIfNeeded(SharedPreferences prefs, boolean useMainGpu) {
         if (!useMainGpu) return;
 
@@ -212,6 +223,7 @@ public class GemmaLocalRuntime implements LocalModelRuntime {
         Log.w(TAG, "GPU policy -> GPU principal falhou com exceção recuperável. Futuramente será usado CPU principal.");
     }
 
+    // Creates a device-specific key so GPU decisions are reset after device/model changes.
     private String deviceFingerprint() {
         return safeBuildValue(Build.MANUFACTURER) + "|"
                 + safeBuildValue(Build.BRAND) + "|"
@@ -224,6 +236,7 @@ public class GemmaLocalRuntime implements LocalModelRuntime {
         return value == null ? "" : value.trim().toLowerCase(Locale.ROOT);
     }
 
+    // Writes image bytes to app cache for one inference call.
     private File persistTempImage(byte[] imageBytes, String mimeType) throws IOException {
         if (cacheDirPath == null) {
             throw new IOException("Diretoria de cache indisponível.");
@@ -243,6 +256,7 @@ public class GemmaLocalRuntime implements LocalModelRuntime {
         return output;
     }
 
+    // Writes audio bytes to app cache for one inference call.
     private File persistTempAudio(byte[] audioBytes, String mimeType) throws IOException {
         if (cacheDirPath == null) {
             throw new IOException("Diretoria de cache indisponível.");
