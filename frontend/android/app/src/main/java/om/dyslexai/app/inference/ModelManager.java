@@ -85,6 +85,7 @@ public class ModelManager {
     }
 
     private void downloadModel(Context context, ProgressCallback callback) throws Exception {
+        // Downloads to a partial file first so interrupted installs never look valid to the runtime.
         File modelFile = getDownloadTargetFile(context);
         File parentDir = modelFile.getParentFile();
         if (parentDir == null) {
@@ -172,6 +173,8 @@ public class ModelManager {
     }
 
     private File getInstalledModelFile(Context context) {
+        // Keep the original developer path when it is available, but support normal APK installs
+        // by falling back to app-private storage on devices where /data/local/tmp is not writable.
         File preferredModel = new File(MODEL_PATH);
         if (isValidModelFile(preferredModel)) {
             return preferredModel;

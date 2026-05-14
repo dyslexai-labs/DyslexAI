@@ -1,5 +1,6 @@
 <template>
   <div class="player-app" :class="[viewportClasses, { 'is-entry-screen': screen === 'home', 'is-app-screen': screen !== 'home' }]">
+    <!-- Native-only gate: blocks the app until the Gemma 4 LiteRT-LM file exists and the runtime is ready. -->
     <section v-if="nativeModelGateVisible" class="model-setup-view" :aria-label="t('model.preparing')">
       <div class="model-setup-panel">
         <div class="model-setup-brand">
@@ -267,6 +268,8 @@ async function warmBackend() {
 }
 
 const screen = ref('home')
+
+// Model setup states are driven by the Android Capacitor plugin: checking, downloading, installed, error.
 const modelStatus = ref('checking')
 const modelProgressPercent = ref(0)
 const modelDownloadedMb = ref(0)
@@ -602,11 +605,6 @@ function startImageFlow() {
   setScreen('select-image-source')
 }
 async function setSelectedImageFromDataUrl(dataUrl, mimeType = 'image/jpeg') {
-  console.log('[DyslexAI] Imagem recebida no frontend:', {
-    mimeType,
-    estimatedSizeKb: Math.round((dataUrl?.length || 0) / 1024),
-  })
-
   let preparedImage
 
   if (isNativeAndroid()) {
@@ -614,18 +612,6 @@ async function setSelectedImageFromDataUrl(dataUrl, mimeType = 'image/jpeg') {
       const result = await DyslexAIPlugin.prepareImage({
         imageBase64: dataUrl,
         mode: 'balanced',
-      })
-
-      console.log('[DyslexAI] Pré-processamento Android concluído:', {
-        mode: result.mode,
-        original: `${result.originalWidth}x${result.originalHeight}`,
-        decoded: `${result.decodedWidth}x${result.decodedHeight}`,
-        crop: `${result.cropWidth}x${result.cropHeight}`,
-        final: `${result.finalWidth}x${result.finalHeight}`,
-        inputSizeKb: result.inputSizeKb,
-        finalSizeKb: result.finalSizeKb,
-        jpegQuality: result.jpegQuality,
-        elapsedMs: result.elapsedMs,
       })
 
       preparedImage = {
@@ -639,11 +625,6 @@ async function setSelectedImageFromDataUrl(dataUrl, mimeType = 'image/jpeg') {
   } else {
     preparedImage = await optimizeImageForInference(dataUrl)
   }
-
-  console.log('[DyslexAI] Imagem final guardada para inferência:', {
-    mimeType: preparedImage.mimeType,
-    estimatedSizeKb: Math.round((preparedImage.dataUrl?.length || 0) / 1024),
-  })
 
   selectedImageBase64.value = preparedImage.dataUrl
   selectedImageMimeType.value = preparedImage.mimeType || mimeType || 'image/jpeg'
@@ -686,15 +667,6 @@ function optimizeImageForInference(dataUrl) {
       context.drawImage(image, 0, 0, targetWidth, targetHeight)
 
       const optimizedDataUrl = canvas.toDataURL('image/jpeg', imageOptimizationQuality)
-
-      console.log('[DyslexAI] Imagem otimizada por Canvas:', {
-        originalSizeKb: Math.round(dataUrl.length / 1024),
-        optimizedSizeKb: Math.round(optimizedDataUrl.length / 1024),
-        originalDimensions: `${sourceWidth}x${sourceHeight}`,
-        optimizedDimensions: `${targetWidth}x${targetHeight}`,
-        maxEdge: imageOptimizationMaxEdge,
-        quality: imageOptimizationQuality,
-      })
 
       resolve({ dataUrl: optimizedDataUrl, mimeType: 'image/jpeg' })
     }
@@ -1016,19 +988,11 @@ async function generateReadingPhrase() {
     spokenText.value = ''
     spokenTranscription.value = ''
 
-    console.log('[DyslexAI] A gerar frase...', {
-      ageGroup: readingAgeGroup.value,
-      level: readingLevel.value,
-      type: readingType.value,
-    })
-
     const result = await inference.generateReadingPhrase({
       ageGroup: readingAgeGroup.value,
       level: readingLevel.value,
       type: readingType.value,
     })
-
-    console.log('[DyslexAI] Resultado da geração de frase:', result)
 
     expectedReadingText.value = (result?.text || '').trim()
     syllabifiedOriginalText.value = syllabifyText(expectedReadingText.value)

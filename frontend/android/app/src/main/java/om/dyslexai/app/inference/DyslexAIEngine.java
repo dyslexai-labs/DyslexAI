@@ -71,14 +71,17 @@ public class DyslexAIEngine {
 
         Log.i(TAG, "processText() -> texto recebido com comprimento=" + (text == null ? 0 : text.length()));
 
+        // Portuguese prompts remain the default contract; English is selected only from the UI locale.
         String prompt = isEnglish(locale) ? buildSimplificationPromptEn(text) : buildSimplificationPrompt(text);
-        Log.i(TAG, "Prompt de simplificação enviada ao runtime:\n" + prompt);
+        Log.i(TAG, "Prompt de simplificação preparado. locale=" + normalizeLocale(locale)
+                + ", promptChars=" + prompt.length());
 
         String rawSimplified = runtime.inferText(prompt);
-        Log.i(TAG, "Resposta bruta de simplificação:\n" + rawSimplified);
+        Log.i(TAG, "Resposta bruta de simplificação recebida. chars="
+                + (rawSimplified == null ? 0 : rawSimplified.length()));
 
         String simplified = cleanModelText(rawSimplified);
-        Log.i(TAG, "Resposta limpa de simplificação:\n" + simplified);
+        Log.i(TAG, "Resposta limpa de simplificação. chars=" + simplified.length());
 
         if (simplified.isEmpty()) {
             Log.w(TAG, "Resposta simplificada vazia. Será usado o texto original.");
@@ -105,15 +108,17 @@ public class DyslexAIEngine {
                 ", decodeMs=" + elapsedMs(decodeStart));
 
         String prompt = isEnglish(locale) ? buildImageFullPromptEn() : buildImageFullPrompt();
-        Log.i(TAG, "Prompt única de imagem enviada ao runtime (" + prompt.length() + " chars):\n" + prompt);
+        Log.i(TAG, "Prompt única de imagem preparada. locale=" + normalizeLocale(locale)
+                + ", promptChars=" + prompt.length());
 
         long inferStart = System.nanoTime();
         String raw = runtime.inferImage(imageBytes, safe(mimeType, "image/jpeg"), prompt);
-        Log.i(TAG, "Resposta bruta da imagem one-pass inferMs=" + elapsedMs(inferStart) + ":\n" + raw);
+        Log.i(TAG, "Resposta bruta da imagem recebida. inferMs=" + elapsedMs(inferStart)
+                + ", chars=" + (raw == null ? 0 : raw.length()));
 
         long parseStart = System.nanoTime();
         String cleaned = cleanModelText(raw);
-        Log.i(TAG, "Resposta limpa da imagem one-pass:\n" + cleaned);
+        Log.i(TAG, "Resposta limpa da imagem. chars=" + cleaned.length());
 
         JSObject result = parseImageFullResult(cleaned);
         JSONObject meta = result.optJSONObject("meta");
@@ -141,13 +146,15 @@ public class DyslexAIEngine {
         Log.i(TAG, "generateReadingPhrase() -> ageGroup=" + ageGroup + ", level=" + level + ", type=" + type);
 
         String prompt = isEnglish(locale) ? buildReadingPhrasePromptEn(ageGroup, level, type) : buildReadingPhrasePrompt(ageGroup, level, type);
-        Log.i(TAG, "Prompt de geração de frase enviada ao runtime:\n" + prompt);
+        Log.i(TAG, "Prompt de geração de frase preparado. locale=" + normalizeLocale(locale)
+                + ", promptChars=" + prompt.length());
 
         String raw = runtime.inferText(prompt);
-        Log.i(TAG, "Resposta bruta da geração de frase:\n" + raw);
+        Log.i(TAG, "Resposta bruta da geração de frase recebida. chars="
+                + (raw == null ? 0 : raw.length()));
 
         String cleaned = cleanModelText(raw);
-        Log.i(TAG, "Resposta limpa da geração de frase:\n" + cleaned);
+        Log.i(TAG, "Resposta limpa da geração de frase. chars=" + cleaned.length());
 
         JSObject result = parseGeneratedPhrase(cleaned, ageGroup, level, type);
         if (isEnglish(locale) && result.optString("language", "").trim().isEmpty()) {
@@ -192,7 +199,8 @@ public class DyslexAIEngine {
         }
 
         String transcriptionPrompt = isEnglish(locale) ? buildAudioTranscriptionOnlyPromptEn() : buildAudioTranscriptionOnlyPrompt();
-        Log.i(TAG, "Prompt de TRANSCRIÇÃO enviada ao runtime:\n" + transcriptionPrompt);
+        Log.i(TAG, "Prompt de transcrição preparado. locale=" + normalizeLocale(locale)
+                + ", promptChars=" + transcriptionPrompt.length());
 
         String rawTranscription;
         try {
@@ -202,7 +210,8 @@ public class DyslexAIEngine {
             return buildAudioDecodeFallbackResult(expectedText, mimeType, audioBytes.length, e, locale);
         }
 
-        Log.i(TAG, "Resposta bruta da TRANSCRIÇÃO:\n" + rawTranscription);
+        Log.i(TAG, "Resposta bruta da transcrição recebida. chars="
+                + (rawTranscription == null ? 0 : rawTranscription.length()));
 
         JSObject transcriptionParsed = parseModelJson(rawTranscription);
         String transcription = safe(transcriptionParsed.optString("transcription", ""), "");
@@ -222,11 +231,13 @@ public class DyslexAIEngine {
             String feedbackPrompt = isEnglish(locale)
                     ? buildAudioReadingFeedbackPromptEn(expectedText, transcription)
                     : buildAudioReadingFeedbackPrompt(expectedText, transcription);
-            Log.i(TAG, "Prompt de FEEDBACK enviada ao runtime:\n" + feedbackPrompt);
+            Log.i(TAG, "Prompt de feedback preparado. locale=" + normalizeLocale(locale)
+                    + ", promptChars=" + feedbackPrompt.length());
 
             try {
                 rawFeedback = runtime.inferText(feedbackPrompt);
-                Log.i(TAG, "Resposta bruta do FEEDBACK:\n" + rawFeedback);
+                Log.i(TAG, "Resposta bruta do feedback recebida. chars="
+                        + (rawFeedback == null ? 0 : rawFeedback.length()));
                 feedbackParsed = parseModelJson(rawFeedback);
             } catch (Exception e) {
                 Log.e(TAG, "inferText() para feedback falhou. Vou devolver transcrição sem análise completa.", e);
@@ -728,6 +739,7 @@ public class DyslexAIEngine {
 
     private void ensureRuntime(Context context) throws Exception {
         if (!runtime.isReady()) {
+            // Lazy initialization keeps the Capacitor bridge responsive during startup.
             Log.i(TAG, "ensureRuntime() -> runtime não estava pronto, a inicializar...");
             runtime.initialize(context);
             Log.i(TAG, "ensureRuntime() -> runtime inicializado.");

@@ -30,6 +30,7 @@ public class GemmaLocalRuntime implements LocalModelRuntime {
         if (initialized) return;
         long start = System.nanoTime();
 
+        // Initializes the local Gemma 4 LiteRT-LM runtime using the model managed by ModelManager.
         String modelPath = new ModelManager().resolveModelPath(context);
         File modelFile = new File(modelPath);
         if (!modelFile.exists()) {
@@ -76,13 +77,13 @@ public class GemmaLocalRuntime implements LocalModelRuntime {
             throw new IllegalStateException("Runtime ainda não inicializado.");
         }
 
-        Log.i(TAG, "A inferir texto localmente...");
-        Log.i(TAG, "Prompt de texto enviada:\n" + prompt);
+        Log.i(TAG, "A inferir texto localmente. promptChars=" + (prompt == null ? 0 : prompt.length()));
 
         long start = System.nanoTime();
         String response = LiteRtBridge.runText(engine, prompt);
 
-        Log.i(TAG, "Resposta de texto recebida. totalMs=" + elapsedMs(start) + "\n" + response);
+        Log.i(TAG, "Resposta de texto recebida. totalMs=" + elapsedMs(start)
+                + ", responseChars=" + (response == null ? 0 : response.length()));
         return response;
     }
 
@@ -98,12 +99,13 @@ public class GemmaLocalRuntime implements LocalModelRuntime {
         Log.i(TAG, "A inferir imagem localmente: " + imageFile.getAbsolutePath());
         Log.i(TAG, "MimeType da imagem: " + mimeType);
         Log.i(TAG, "Tamanho da imagem em bytes: " + imageBytes.length);
-        Log.i(TAG, "Prompt de imagem enviada:\n" + prompt);
+        Log.i(TAG, "Prompt de imagem preparado. promptChars=" + (prompt == null ? 0 : prompt.length()));
 
         long inferStart = System.nanoTime();
         String response = LiteRtBridge.runImage(engine, imageFile.getAbsolutePath(), prompt);
 
-        Log.i(TAG, "Resposta da imagem recebida. totalInferMs=" + elapsedMs(inferStart) + "\n" + response);
+        Log.i(TAG, "Resposta da imagem recebida. totalInferMs=" + elapsedMs(inferStart)
+                + ", responseChars=" + (response == null ? 0 : response.length()));
         return response;
     }
 
@@ -116,7 +118,7 @@ public class GemmaLocalRuntime implements LocalModelRuntime {
         Log.i(TAG, "inferAudio() chamado.");
         Log.i(TAG, "MimeType do áudio: " + mimeType);
         Log.i(TAG, "Tamanho do áudio em bytes: " + (audioBytes == null ? 0 : audioBytes.length));
-        Log.i(TAG, "Prompt de áudio enviada:\n" + prompt);
+        Log.i(TAG, "Prompt de áudio preparado. promptChars=" + (prompt == null ? 0 : prompt.length()));
 
         long persistStart = System.nanoTime();
         File audioFile = persistTempAudio(audioBytes, mimeType);
@@ -126,16 +128,19 @@ public class GemmaLocalRuntime implements LocalModelRuntime {
         long inferStart = System.nanoTime();
         String response = LiteRtBridge.runAudioFile(engine, audioFile.getAbsolutePath(), prompt);
 
-        Log.i(TAG, "Resposta de áudio recebida. totalInferMs=" + elapsedMs(inferStart) + "\n" + response);
+        Log.i(TAG, "Resposta de áudio recebida. totalInferMs=" + elapsedMs(inferStart)
+                + ", responseChars=" + (response == null ? 0 : response.length()));
         return response;
     }
 
     @Override
     public String getName() {
-        return "gemma-3n-e2b-local";
+        return "gemma-4-e4b-litert-lm-local";
     }
 
     private void reconcilePendingGpuProbe(SharedPreferences prefs) {
+        // Native GPU failures can kill the process before Java receives an exception.
+        // A pending probe on the next launch means the main LLM backend should fall back to CPU.
         String currentFingerprint = deviceFingerprint();
         String savedFingerprint = prefs.getString(KEY_DEVICE_FINGERPRINT, "");
 

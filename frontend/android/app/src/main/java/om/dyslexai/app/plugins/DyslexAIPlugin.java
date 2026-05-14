@@ -80,6 +80,7 @@ public class DyslexAIPlugin extends Plugin {
 
         executor.execute(() -> {
             try {
+                // Keeps the frontend gate informed while the model is downloaded and the runtime starts.
                 JSObject installed = modelManager.ensureInstalled(getContext(), payload ->
                         notifyListeners("modelDownloadProgress", payload)
                 );
@@ -151,6 +152,7 @@ public void prepareImage(PluginCall call) {
 
     executor.execute(() -> {
         try {
+            // Reduces camera/gallery images before multimodal inference without changing the frontend contract.
             JSObject result = ImagePreprocessor.prepare(imageBase64, mode);
 
             Log.i(TAG, "prepareImage() -> concluído.");
@@ -242,6 +244,7 @@ public void prepareImage(PluginCall call) {
 
         executor.execute(() -> {
             try {
+                // Audio is recorded as WAV in-app and then analyzed by the same local Gemma runtime.
                 Log.i(TAG, "processAudio() -> a enviar para o engine...");
                 JSObject result = engine.processAudio(getContext(), audioBase64, mimeType, expectedText, locale);
                 Log.i(TAG, "processAudio() -> concluído com sucesso.");

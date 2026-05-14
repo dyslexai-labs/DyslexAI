@@ -12,6 +12,7 @@ public class Gemma4Runtime implements LocalModelRuntime {
 
     @Override
     public void initialize(Context context) throws Exception {
+        // Experimental stub kept for reference; RuntimeFactory currently uses GemmaLocalRuntime.
         File modelFile = new File("/data/local/tmp/llm/gemma4/model.litertlm");
 
         if (!modelFile.exists()) {
