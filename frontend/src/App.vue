@@ -1,5 +1,42 @@
 <template>
   <div class="player-app" :class="[viewportClasses, { 'is-entry-screen': screen === 'home', 'is-app-screen': screen !== 'home' }]">
+    <section v-if="nativeModelGateVisible" class="model-setup-view" aria-label="Preparação do modelo local">
+      <div class="model-setup-panel">
+        <div class="model-setup-brand">
+          <div class="app-entry-logo" aria-hidden="true">
+            <span class="app-entry-logo-blue"></span>
+            <span class="app-entry-logo-red"></span>
+            <span class="app-entry-logo-yellow"></span>
+            <span class="app-entry-logo-green"></span>
+          </div>
+          <div>
+            <div class="model-setup-eyebrow">DyslexAI</div>
+            <h1>{{ modelSetupTitle }}</h1>
+          </div>
+        </div>
+
+        <p class="model-setup-copy">This may take several minutes on first launch.</p>
+        <p class="model-setup-copy">Recommended: Wi-Fi connection.</p>
+
+        <div class="model-progress-block" role="status" aria-live="polite">
+          <div class="model-progress-header">
+            <span>{{ modelSetupMessage }}</span>
+            <strong>{{ modelProgressPercent }}%</strong>
+          </div>
+          <div class="model-progress-track" aria-hidden="true">
+            <div class="model-progress-fill" :style="{ width: `${modelProgressPercent}%` }"></div>
+          </div>
+          <div class="model-progress-meta">
+            {{ modelProgressLabel }}
+          </div>
+        </div>
+
+        <button v-if="modelStatus === 'error'" class="model-retry-button" @click="retryModelDownload">
+          Retry download
+        </button>
+      </div>
+    </section>
+
     <main class="app-shell">
       <section v-if="screen === 'home'" class="app-entry-view" aria-label="Entrada">
         <header class="app-entry-header">
@@ -198,6 +235,7 @@ import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { Camera, CameraResultType, CameraSource } from '@capacitor/camera'
 import { createInferenceService } from './services/inference/createInferenceService'
 import { Capacitor } from '@capacitor/core'
+import { DyslexAIPlugin } from './services/inference/capacitorDyslexAI'
 import { useRoute, useRouter } from 'vue-router'
 import { routeScreenNames } from './router'
 import AudioPrepareView from './views/AudioPrepareView.vue'
@@ -211,6 +249,7 @@ const route = useRoute()
 const router = useRouter()
 
 let warmed = false
+let modelProgressListener = null
 
 async function warmBackend() {
   if (warmed) return
@@ -223,6 +262,13 @@ async function warmBackend() {
 }
 
 const screen = ref('home')
+const modelStatus = ref('checking')
+const modelProgressPercent = ref(0)
+const modelDownloadedMb = ref(0)
+const modelTotalMb = ref(0)
+const modelSetupMessage = ref('Preparing local AI model...')
+const modelErrorMessage = ref('')
+const modelReadyForApp = ref(false)
 const previewUrl = ref('')
 const audioPreviewUrl = ref('')
 const selectedFile = ref(null)
@@ -243,6 +289,26 @@ const isRecording = ref(false)
 const isRecorderBusy = ref(false)
 const recordingElapsedMs = ref(0)
 
+const nativeModelGateVisible = computed(() => {
+  return isNativeAndroid() && !modelReadyForApp.value
+})
+
+const modelSetupTitle = computed(() => {
+  if (modelStatus.value === 'downloading') return 'Preparing local AI model...'
+  if (modelStatus.value === 'error') return modelSetupMessage.value || 'Download failed.'
+  return 'Preparing local AI model...'
+})
+
+const modelProgressLabel = computed(() => {
+  if (modelStatus.value === 'error') {
+    return modelErrorMessage.value || 'Please check your connection and try again.'
+  }
+
+  const downloaded = formatModelSize(modelDownloadedMb.value)
+  const total = modelTotalMb.value > 0 ? formatModelSize(modelTotalMb.value) : 'calculating...'
+  return `${downloaded} / ${total}`
+})
+
 const activeFlow = ref('image')
 const openValidation = ref(false)
 const showSettings = ref(true)
@@ -254,6 +320,7 @@ const viewportSize = ref('medium')
 function setScreen(nextScreen) {
   const safeScreen = routeScreenNames.includes(nextScreen) ? nextScreen : 'home'
   screen.value = safeScreen
+  refreshLayoutAfterPaint()
 
   if (route.name !== safeScreen) {
     router.push({ name: safeScreen }).catch(() => { })
@@ -263,6 +330,7 @@ function setScreen(nextScreen) {
 watch(() => route.name, (routeName) => {
   if (routeScreenNames.includes(routeName) && screen.value !== routeName) {
     screen.value = routeName
+    refreshLayoutAfterPaint()
   }
 }, { immediate: true })
 
@@ -440,8 +508,83 @@ function updateLayoutFlags() {
   }
 }
 
+function refreshLayoutAfterPaint() {
+  window.requestAnimationFrame(() => {
+    updateLayoutFlags()
+    window.requestAnimationFrame(updateLayoutFlags)
+  })
+}
+
 function isNativeAndroid() {
   return Capacitor.isNativePlatform() && Capacitor.getPlatform() === 'android'
+}
+
+function formatModelSize(sizeMb) {
+  const value = Number(sizeMb || 0)
+  if (value >= 1024) {
+    return `${(value / 1024).toFixed(1)} GB`
+  }
+  return `${value.toFixed(1)} MB`
+}
+
+function applyModelProgress(payload = {}) {
+  const status = payload.status || 'checking'
+  modelStatus.value = status
+  modelProgressPercent.value = Math.max(0, Math.min(100, Number(payload.percent || 0)))
+  modelDownloadedMb.value = Number(payload.downloadedMb || 0)
+  modelTotalMb.value = Number(payload.totalMb || 0)
+
+  if (payload.message) {
+    modelSetupMessage.value = payload.message
+  } else if (status === 'downloading') {
+    modelSetupMessage.value = 'Downloading model...'
+  } else if (status === 'installed') {
+    modelSetupMessage.value = 'Model installed successfully'
+  }
+
+  if (status === 'error') {
+    modelErrorMessage.value = payload.error || 'Please check your connection and try again.'
+  }
+}
+
+async function prepareNativeModel() {
+  if (!isNativeAndroid()) {
+    return
+  }
+
+  modelStatus.value = 'checking'
+  modelReadyForApp.value = false
+  modelSetupMessage.value = 'Preparing local AI model...'
+  modelErrorMessage.value = ''
+
+  try {
+    const state = await DyslexAIPlugin.getModelState()
+    applyModelProgress(state)
+
+    const result = await DyslexAIPlugin.ensureModelReady()
+    applyModelProgress({
+      ...(result?.model || {}),
+      status: 'installed',
+      percent: 100,
+      message: result?.message || 'Model installed successfully',
+    })
+
+    warmed = true
+    window.setTimeout(() => {
+      modelReadyForApp.value = true
+      refreshLayoutAfterPaint()
+    }, 900)
+  } catch (error) {
+    modelStatus.value = 'error'
+    modelSetupMessage.value = error?.message?.includes('runtime failed')
+      ? 'Local runtime failed to start.'
+      : 'Download failed.'
+    modelErrorMessage.value = error?.message || 'Please check your connection and try again.'
+  }
+}
+
+function retryModelDownload() {
+  prepareNativeModel()
 }
 
 function startImageFlow() {
@@ -960,6 +1103,12 @@ async function processRealAudio(file) {
   const data = await inference.processAudio(file, expectedReadingText.value)
   const normalized = normalizeAudioResult(data)
 
+  if (normalized.no_speech_detected) {
+    throw new NoSpeechDetectedError(
+      normalized.comparison_summary || normalized.improvement_tip || 'Não ouvi fala suficiente na gravação. Tenta gravar novamente.'
+    )
+  }
+
   spokenTranscription.value = normalized.transcription
   spokenText.value = normalized.clean_text || normalized.spoken_text || normalized.transcription
   spokenLines.value = normalized.spoken_lines.length
@@ -1002,6 +1151,7 @@ function normalizeAudioResult(data = {}) {
       spokenTextValue || cleanText || transcription
     ),
     issues: normalizeAudioIssues(result.issues),
+    no_speech_detected: result.no_speech_detected === true,
     comparison_summary: cleanAudioText(result.comparison_summary || result.feedback_comment || ''),
     positive_feedback: cleanAudioText(result.positive_feedback || ''),
     improvement_tip: cleanAudioText(result.improvement_tip || ''),
@@ -1198,8 +1348,17 @@ async function processAudio() {
     enterReader('spoken')
   } catch (error) {
     console.error(error)
-    alert(error.message || 'Ocorreu um erro ao processar o áudio.')
+    alert(error instanceof NoSpeechDetectedError
+      ? error.message
+      : (error.message || 'Ocorreu um erro ao processar o áudio.'))
     setScreen('confirm-audio')
+  }
+}
+
+class NoSpeechDetectedError extends Error {
+  constructor(message) {
+    super(message)
+    this.name = 'NoSpeechDetectedError'
   }
 }
 
@@ -1520,8 +1679,14 @@ function resetAll() {
   processingTitle.value = 'A preparar a leitura'
 }
 
-onMounted(() => {
-  warmBackend()
+onMounted(async () => {
+  if (isNativeAndroid()) {
+    modelProgressListener = await DyslexAIPlugin.addListener('modelDownloadProgress', applyModelProgress)
+    prepareNativeModel()
+  } else {
+    warmBackend()
+  }
+
   updateLayoutFlags()
   window.addEventListener('resize', updateLayoutFlags)
   document.addEventListener('fullscreenchange', onFullscreenChange)
@@ -1538,6 +1703,10 @@ onBeforeUnmount(() => {
   stopMediaTracks()
   window.removeEventListener('resize', updateLayoutFlags)
   document.removeEventListener('fullscreenchange', onFullscreenChange)
+  if (modelProgressListener) {
+    modelProgressListener.remove()
+    modelProgressListener = null
+  }
   clearPreviewUrls()
 })
 </script>
@@ -1571,6 +1740,104 @@ audio {
   max-width: 1060px;
   margin: 0 auto;
   padding: 18px;
+}
+
+.model-setup-view {
+  position: fixed;
+  inset: 0;
+  z-index: 5000;
+  width: 100vw;
+  height: 100dvh;
+  display: grid;
+  place-items: center;
+  padding: max(24px, env(safe-area-inset-top)) max(24px, env(safe-area-inset-right)) max(24px, env(safe-area-inset-bottom)) max(24px, env(safe-area-inset-left));
+  overflow: auto;
+  background: linear-gradient(180deg, #f8fbff 0%, #eef3f8 100%);
+}
+
+.model-setup-panel {
+  width: min(520px, 100%);
+  border: 1px solid #dde6f0;
+  border-radius: 8px;
+  padding: clamp(22px, 5vw, 36px);
+  background: #ffffff;
+  box-shadow: 0 18px 48px rgba(20, 33, 61, 0.12);
+}
+
+.model-setup-brand {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  margin-bottom: 22px;
+}
+
+.model-setup-eyebrow {
+  color: #5f6f86;
+  font-size: 0.82rem;
+  font-weight: 800;
+  text-transform: uppercase;
+}
+
+.model-setup-panel h1 {
+  margin: 2px 0 0;
+  color: #14213d;
+  font-size: clamp(1.45rem, 5vw, 2rem);
+  line-height: 1.1;
+}
+
+.model-setup-copy {
+  margin: 0 0 8px;
+  color: #4b5f79;
+  font-size: 1rem;
+  line-height: 1.5;
+}
+
+.model-progress-block {
+  margin-top: 24px;
+}
+
+.model-progress-header,
+.model-progress-meta {
+  display: flex;
+  justify-content: space-between;
+  gap: 16px;
+  color: #223047;
+  font-size: 0.95rem;
+}
+
+.model-progress-header strong {
+  font-variant-numeric: tabular-nums;
+}
+
+.model-progress-track {
+  height: 12px;
+  margin: 12px 0 10px;
+  overflow: hidden;
+  border-radius: 999px;
+  background: #d9e2ec;
+}
+
+.model-progress-fill {
+  height: 100%;
+  border-radius: inherit;
+  background: linear-gradient(90deg, #1a73e8 0%, #34a853 100%);
+  transition: width 180ms ease;
+}
+
+.model-progress-meta {
+  color: #607086;
+  font-variant-numeric: tabular-nums;
+}
+
+.model-retry-button {
+  width: 100%;
+  min-height: 48px;
+  margin-top: 24px;
+  border: 0;
+  border-radius: 8px;
+  color: #fff;
+  background: #1a73e8;
+  font-weight: 800;
 }
 
 .screen-center {
@@ -12952,6 +13219,70 @@ body #app .reader-text-panel .reader-word-chip.active {
   border-radius: 5px !important;
   box-shadow: 0 0 0 2px rgba(26, 115, 232, .18) !important;
   padding: 0 .12em !important;
+}
+
+/* O fluxo novo de áudio é uma view própria; estas regras anulam CSS legacy
+   global que usa os mesmos nomes internos e deslocava o painel em Android real. */
+@media (orientation: landscape) {
+  body #app .player-app.is-app-screen .audio-prepare-view .audio-prepare-main {
+    display: grid !important;
+    grid-template-columns: minmax(0, 1fr) !important;
+    grid-template-rows: minmax(0, 1fr) !important;
+    align-items: stretch !important;
+    justify-content: stretch !important;
+    gap: 0 !important;
+    padding: 4px clamp(18px, 3.2vw, 30px) max(14px, env(safe-area-inset-bottom)) !important;
+  }
+
+  body #app .player-app.is-app-screen .audio-prepare-view .audio-prepare-main > .flow-intro {
+    display: none !important;
+    grid-column: auto !important;
+    grid-row: auto !important;
+  }
+
+  body #app .player-app.is-app-screen .audio-prepare-view .speech-work-panel {
+    grid-column: auto !important;
+    grid-row: auto !important;
+    align-self: stretch !important;
+    justify-self: stretch !important;
+    display: grid !important;
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) !important;
+    grid-template-rows: minmax(108px, 1fr) auto auto !important;
+    grid-template-areas:
+      "phrase phrase"
+      "config record"
+      "controls controls" !important;
+    gap: 8px !important;
+    width: 100% !important;
+    max-width: none !important;
+    height: 100% !important;
+    max-height: none !important;
+    min-height: 0 !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    overflow: hidden !important;
+    transform: none !important;
+    translate: none !important;
+  }
+
+  body #app .player-app.is-app-screen .audio-prepare-view .speech-phrase-card {
+    grid-area: phrase !important;
+  }
+
+  body #app .player-app.is-app-screen .audio-prepare-view .speech-config-card {
+    grid-area: config !important;
+  }
+
+  body #app .player-app.is-app-screen .audio-prepare-view .speech-record-card {
+    grid-area: record !important;
+  }
+
+  body #app .player-app.is-app-screen .audio-prepare-view .speech-record-controls {
+    grid-area: controls !important;
+    display: grid !important;
+    grid-template-columns: repeat(4, minmax(0, 1fr)) !important;
+    gap: 8px !important;
+  }
 }
 
 </style>

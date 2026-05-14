@@ -21,6 +21,14 @@ export function createMobileInferenceProvider() {
       return DyslexAIPlugin.getCapabilities()
     },
 
+    async getModelState() {
+      return DyslexAIPlugin.getModelState()
+    },
+
+    async ensureModelReady() {
+      return DyslexAIPlugin.ensureModelReady()
+    },
+
     async processText(text) {
       return DyslexAIPlugin.processText({ text })
     },

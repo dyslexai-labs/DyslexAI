@@ -23,6 +23,9 @@ public class DyslexAIEngine {
     private static final Pattern LINE_SPLIT_PATTERN = Pattern.compile("\\r?\\n+|(?<=[\\.!\\?])\\s+");
     private static final int IMAGE_MAX_EDGE_PX = 640;
     private static final int IMAGE_JPEG_QUALITY = 62;
+    private static final double MIN_AUDIO_SPEECH_DURATION_SECONDS = 0.7;
+    private static final double MAX_SILENCE_RMS = 250.0;
+    private static final int MAX_SILENCE_PEAK = 1000;
 
     private final LocalModelRuntime runtime;
 
@@ -53,6 +56,10 @@ public class DyslexAIEngine {
 
         Log.i(TAG, "getCapabilities() -> text=true, image=true, audio=true, ready=" + runtime.isReady());
         return ret;
+    }
+
+    public void initialize(Context context) throws Exception {
+        ensureRuntime(context);
     }
 
     public JSObject processText(Context context, String text) throws Exception {
@@ -150,6 +157,18 @@ public class DyslexAIEngine {
 
         byte[] audioBytes = decodeBase64Payload(audioBase64);
         Log.i(TAG, "processAudio() -> bytes decodificados=" + audioBytes.length);
+
+        AudioSignalInfo signalInfo = inspectWavSignal(audioBytes);
+        if (signalInfo != null) {
+            Log.i(TAG, "processAudio() -> WAV analisado: durationSec=" + signalInfo.durationSeconds
+                    + ", rms=" + signalInfo.rms
+                    + ", peak=" + signalInfo.peak);
+
+            if (!signalInfo.hasLikelySpeech()) {
+                Log.w(TAG, "processAudio() -> áudio sem fala provável. Vou evitar inferência local.");
+                return buildAudioNoSpeechResult(expectedText, mimeType, audioBytes.length, signalInfo);
+            }
+        }
 
         String transcriptionPrompt = buildAudioTranscriptionOnlyPrompt();
         Log.i(TAG, "Prompt de TRANSCRIÇÃO enviada ao runtime:\n" + transcriptionPrompt);
@@ -412,6 +431,128 @@ public class DyslexAIEngine {
                 + mimeType + ", bytes=" + audioBytesLength);
 
         return result;
+    }
+
+    private JSObject buildAudioNoSpeechResult(String expectedText, String mimeType, int audioBytesLength, AudioSignalInfo signalInfo) {
+        String expected = safe(expectedText, "");
+        String feedback = "Não ouvi fala suficiente na gravação. Tenta gravar novamente, falando perto do microfone.";
+
+        JSObject result = new JSObject();
+        result.put("success", true);
+        result.put("no_speech_detected", true);
+        result.put("transcription", "");
+        result.put("expected_text", expected);
+        result.put("clean_text", expected);
+        result.put("spoken_text", "");
+        result.put("spoken_lines", new JSArray());
+        result.put("syllabified_expected_text", expected);
+        result.put("syllabified_spoken_text", "");
+        result.put("feedback_comment", feedback);
+        result.put("comparison_summary", feedback);
+        result.put("positive_feedback", "");
+        result.put("improvement_tip", "Grava outra vez e lê a frase em voz alta.");
+        result.put("issues", new JSArray());
+
+        JSObject meta = new JSObject();
+        meta.put("source", "mobile");
+        meta.put("engine", runtime.getName());
+        meta.put("mode", "audio-no-speech-detected");
+        meta.put("mimeType", safe(mimeType, ""));
+        meta.put("audioBytes", audioBytesLength);
+        meta.put("durationSeconds", signalInfo == null ? 0.0 : signalInfo.durationSeconds);
+        meta.put("rms", signalInfo == null ? 0.0 : signalInfo.rms);
+        meta.put("peak", signalInfo == null ? 0 : signalInfo.peak);
+
+        result.put("meta", meta);
+        return result;
+    }
+
+    private AudioSignalInfo inspectWavSignal(byte[] wavBytes) {
+        if (wavBytes == null || wavBytes.length < 44) {
+            return null;
+        }
+
+        if (wavBytes[0] != 'R' || wavBytes[1] != 'I' || wavBytes[2] != 'F' || wavBytes[3] != 'F'
+                || wavBytes[8] != 'W' || wavBytes[9] != 'A' || wavBytes[10] != 'V' || wavBytes[11] != 'E') {
+            return null;
+        }
+
+        int sampleRate = readLeInt(wavBytes, 24);
+        int bitsPerSample = readLeShort(wavBytes, 34);
+        int dataOffset = -1;
+        int dataSize = 0;
+
+        int offset = 12;
+        while (offset + 8 <= wavBytes.length) {
+            String chunkId = new String(new byte[]{
+                    wavBytes[offset],
+                    wavBytes[offset + 1],
+                    wavBytes[offset + 2],
+                    wavBytes[offset + 3]
+            });
+            int chunkSize = readLeInt(wavBytes, offset + 4);
+            int chunkDataOffset = offset + 8;
+
+            if ("data".equals(chunkId)) {
+                dataOffset = chunkDataOffset;
+                dataSize = Math.max(0, Math.min(chunkSize, wavBytes.length - chunkDataOffset));
+                break;
+            }
+
+            offset = chunkDataOffset + chunkSize + (chunkSize % 2);
+        }
+
+        if (sampleRate <= 0 || bitsPerSample != 16 || dataOffset < 0 || dataSize < 2) {
+            return null;
+        }
+
+        int sampleCount = dataSize / 2;
+        long sumSquares = 0L;
+        int peak = 0;
+
+        for (int i = 0; i < sampleCount; i++) {
+            int sampleOffset = dataOffset + (i * 2);
+            int sample = (short) (((wavBytes[sampleOffset + 1] & 0xff) << 8) | (wavBytes[sampleOffset] & 0xff));
+            int abs = Math.abs(sample);
+            if (abs > peak) {
+                peak = abs;
+            }
+            sumSquares += (long) sample * (long) sample;
+        }
+
+        double rms = Math.sqrt(sumSquares / Math.max(1.0, sampleCount));
+        double durationSeconds = sampleCount / (double) sampleRate;
+        return new AudioSignalInfo(durationSeconds, rms, peak);
+    }
+
+    private int readLeInt(byte[] bytes, int offset) {
+        if (offset < 0 || offset + 4 > bytes.length) return 0;
+        return (bytes[offset] & 0xff)
+                | ((bytes[offset + 1] & 0xff) << 8)
+                | ((bytes[offset + 2] & 0xff) << 16)
+                | ((bytes[offset + 3] & 0xff) << 24);
+    }
+
+    private int readLeShort(byte[] bytes, int offset) {
+        if (offset < 0 || offset + 2 > bytes.length) return 0;
+        return (bytes[offset] & 0xff) | ((bytes[offset + 1] & 0xff) << 8);
+    }
+
+    private static class AudioSignalInfo {
+        final double durationSeconds;
+        final double rms;
+        final int peak;
+
+        AudioSignalInfo(double durationSeconds, double rms, int peak) {
+            this.durationSeconds = durationSeconds;
+            this.rms = rms;
+            this.peak = peak;
+        }
+
+        boolean hasLikelySpeech() {
+            return durationSeconds >= MIN_AUDIO_SPEECH_DURATION_SECONDS
+                    && (rms > MAX_SILENCE_RMS || peak > MAX_SILENCE_PEAK);
+        }
     }
 
     private JSObject parseModelJson(String raw) {

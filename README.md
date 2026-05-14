@@ -137,7 +137,24 @@ The mobile runtime expects the local model file to be present on the Android dev
 /data/local/tmp/llm/gemma/model.litertlm
 ```
 
-The app checks this file during runtime initialization before creating the LiteRT-LM engine.
+The app now manages this file automatically on first launch. The bundled APK does **not** include the model. Instead, the Android app:
+
+1. checks whether `/data/local/tmp/llm/gemma/model.litertlm` already exists
+2. shows a preparation screen if the model is missing
+3. downloads the Gemma 4 E4B LiteRT-LM file, `gemma-4-E4B-it.litertlm`, from Hugging Face
+4. stores it locally as `model.litertlm`
+5. initializes the existing `GemmaLocalRuntime`
+6. enters the normal DyslexAI interface
+
+After this setup, processing is fully local/on-device.
+
+For compatibility with older debug installs, the runtime still uses `/data/local/tmp/llm/gemma/model.litertlm` when that file already exists and is valid. On normal Android installs, where apps cannot create folders under `/data/local/tmp`, the automatic download is stored in the app-private files directory instead.
+
+Model source:
+
+```text
+https://huggingface.co/litert-community/gemma-4-E4B-it-litert-lm/resolve/main/gemma-4-E4B-it.litertlm
+```
 
 Typical development flow:
 

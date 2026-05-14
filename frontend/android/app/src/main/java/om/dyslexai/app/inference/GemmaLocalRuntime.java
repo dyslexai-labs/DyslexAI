@@ -14,7 +14,6 @@ import java.util.UUID;
 public class GemmaLocalRuntime implements LocalModelRuntime {
 
     private static final String TAG = "GemmaLocalRuntime";
-    private static final String MODEL_PATH = "/data/local/tmp/llm/gemma/model.litertlm";
     private static final String GPU_PREFS = "dyslexai_gpu_policy";
     private static final String KEY_MAIN_GPU_SUPPORTED = "main_gpu_supported";
     private static final String KEY_MAIN_GPU_CRASHED = "main_gpu_crashed";
@@ -31,9 +30,10 @@ public class GemmaLocalRuntime implements LocalModelRuntime {
         if (initialized) return;
         long start = System.nanoTime();
 
-        File modelFile = new File(MODEL_PATH);
+        String modelPath = new ModelManager().resolveModelPath(context);
+        File modelFile = new File(modelPath);
         if (!modelFile.exists()) {
-            throw new Exception("Modelo não encontrado em " + MODEL_PATH);
+            throw new Exception("Modelo não encontrado em " + modelPath);
         }
 
         cacheDirPath = context.getCacheDir().getAbsolutePath();
@@ -41,7 +41,7 @@ public class GemmaLocalRuntime implements LocalModelRuntime {
         reconcilePendingGpuProbe(gpuPrefs);
         boolean useMainGpu = shouldUseMainGpu(gpuPrefs);
 
-        Log.i(TAG, "Modelo encontrado: " + MODEL_PATH);
+        Log.i(TAG, "Modelo encontrado: " + modelPath);
         Log.i(TAG, "A inicializar engine LiteRT-LM com suporte de visão e áudio...");
         Log.i(TAG, "Política GPU -> useMainGpu=" + useMainGpu
                 + ", manufacturer=" + Build.MANUFACTURER
@@ -51,7 +51,7 @@ public class GemmaLocalRuntime implements LocalModelRuntime {
         markGpuProbeStartedIfNeeded(gpuPrefs, useMainGpu);
 
         try {
-            engine = LiteRtBridge.createEngine(MODEL_PATH, cacheDirPath, true, useMainGpu);
+            engine = LiteRtBridge.createEngine(modelPath, cacheDirPath, true, useMainGpu);
             markGpuProbeSucceededIfNeeded(gpuPrefs, useMainGpu);
         } catch (Exception e) {
             markGpuProbeFailedIfNeeded(gpuPrefs, useMainGpu);

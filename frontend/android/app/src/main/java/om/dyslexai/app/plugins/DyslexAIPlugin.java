@@ -22,9 +22,10 @@ import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 
 import om.dyslexai.app.inference.DyslexAIEngine;
-import om.dyslexai.app.inference.LocalModelRuntime;
-import om.dyslexai.app.inference.RuntimeFactory;
 import om.dyslexai.app.inference.ImagePreprocessor;
+import om.dyslexai.app.inference.LocalModelRuntime;
+import om.dyslexai.app.inference.ModelManager;
+import om.dyslexai.app.inference.RuntimeFactory;
 
 @CapacitorPlugin(
         name = "DyslexAI",
@@ -38,6 +39,7 @@ public class DyslexAIPlugin extends Plugin {
     private static final String MICROPHONE_PERMISSION = "microphone";
 
     private DyslexAIEngine engine;
+    private final ModelManager modelManager = new ModelManager();
     private TextToSpeech textToSpeech;
     private boolean ttsReady = false;
     private final ConcurrentHashMap<String, PluginCall> pendingTtsCalls = new ConcurrentHashMap<>();
@@ -64,6 +66,48 @@ public class DyslexAIPlugin extends Plugin {
     public void getCapabilities(PluginCall call) {
         Log.i(TAG, "getCapabilities() chamado.");
         call.resolve(engine.getCapabilities());
+    }
+
+    @PluginMethod
+    public void getModelState(PluginCall call) {
+        Log.i(TAG, "getModelState() chamado.");
+        call.resolve(modelManager.getState(getContext()));
+    }
+
+    @PluginMethod
+    public void ensureModelReady(PluginCall call) {
+        Log.i(TAG, "ensureModelReady() chamado.");
+
+        executor.execute(() -> {
+            try {
+                JSObject installed = modelManager.ensureInstalled(getContext(), payload ->
+                        notifyListeners("modelDownloadProgress", payload)
+                );
+
+                JSObject initializing = new JSObject();
+                initializing.put("status", "checking");
+                initializing.put("path", modelManager.resolveModelPath(getContext()));
+                initializing.put("preferredPath", ModelManager.MODEL_PATH);
+                initializing.put("percent", 100);
+                initializing.put("message", "Starting local AI runtime...");
+                notifyListeners("modelDownloadProgress", initializing);
+
+                engine.initialize(getContext());
+
+                JSObject ready = new JSObject();
+                ready.put("success", true);
+                ready.put("status", "installed");
+                ready.put("message", "Model installed successfully");
+                ready.put("path", modelManager.resolveModelPath(getContext()));
+                ready.put("preferredPath", ModelManager.MODEL_PATH);
+                ready.put("engine", engine.health().optString("engine", ""));
+                ready.put("model", installed);
+                call.resolve(ready);
+            } catch (Exception e) {
+                Log.e(TAG, "ensureModelReady() falhou: " + e.getMessage(), e);
+                call.reject("Model installed, but local runtime failed to start: " + e.getMessage(), e);
+            }
+        });
     }
 
     @PluginMethod
