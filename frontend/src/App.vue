@@ -411,14 +411,26 @@ const currentLines = computed(() => {
   }
 
   if (currentTextMode.value === 'spoken') {
-    return splitDisplayLines(syllabifiedSpokenText.value || syllabifyText(spokenText.value || spokenTranscription.value))
+    return syllabifyDisplayLines(
+      spokenLines.value,
+      syllabifiedSpokenText.value,
+      spokenText.value || spokenTranscription.value
+    )
   }
 
   if (currentTextMode.value === 'original') {
-    return splitDisplayLines(syllabifiedOriginalText.value || syllabifyText(correctedText.value))
+    return syllabifyDisplayLines(
+      originalLines.value,
+      syllabifiedOriginalText.value,
+      correctedText.value
+    )
   }
 
-  return splitDisplayLines(syllabifiedSimplifiedText.value || syllabifyText(simplifiedText.value))
+  return syllabifyDisplayLines(
+    simplifiedLines.value,
+    syllabifiedSimplifiedText.value,
+    simplifiedText.value
+  )
 })
 
 const currentWords = computed(() => {
@@ -1209,6 +1221,14 @@ function normalizeAudioIssues(issues) {
 function splitDisplayLines(text) {
   const cleaned = cleanAudioText(text)
   return cleaned ? cleaned.split(/\r?\n+/).map(line => line.trim()).filter(Boolean) : []
+}
+
+function syllabifyDisplayLines(lines, syllabifiedText, fallbackText) {
+  if (Array.isArray(lines) && lines.length) {
+    return lines.map(line => syllabifyText(line)).filter(Boolean)
+  }
+
+  return splitDisplayLines(syllabifiedText || syllabifyText(fallbackText))
 }
 
 function syllabifyText(text) {

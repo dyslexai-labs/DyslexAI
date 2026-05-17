@@ -239,6 +239,9 @@ public class DyslexAIEngine {
         JSObject feedbackParsed = new JSObject();
 
         if (!transcription.trim().isEmpty()) {
+            Log.i(TAG, "processAudio() -> feedback input expectedText=" + safe(expectedText, ""));
+            Log.i(TAG, "processAudio() -> feedback input transcription=" + transcription);
+
             String feedbackPrompt = isEnglish(locale)
                     ? buildAudioReadingFeedbackPromptEn(expectedText, transcription)
                     : buildAudioReadingFeedbackPrompt(expectedText, transcription);
