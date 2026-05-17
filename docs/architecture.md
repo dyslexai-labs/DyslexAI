@@ -1,10 +1,18 @@
 # DyslexAI — Architecture
 
-DyslexAI is an Android reading-assistance app for children with dyslexia.
+DyslexAI is an Android assistive-reading app for children with dyslexia. The hackathon demo is centered on **local Android execution** with **Gemma 4 E4B LiteRT-LM**, using one multimodal model to support image understanding, text simplification, guided reading, and speech-oriented practice.
 
-The final hackathon version focuses on local Android execution using **Gemma 4 E4B LiteRT-LM**, taking advantage of Gemma’s multimodal and multilingual capabilities for accessible reading support.
+## System overview
 
-## Overview
+```text
+Android app
+  -> Vue + Capacitor interface
+  -> native Capacitor bridge
+  -> DyslexAIEngine
+  -> GemmaLocalRuntime
+  -> LiteRT-LM local engine
+  -> local Gemma 4 E4B model on device
+```
 
 ```text
                          ┌──────────────────────────┐
@@ -29,117 +37,109 @@ The final hackathon version focuses on local Android execution using **Gemma 4 E
         │                              │                              │
         ▼                              ▼                              ▼
 ┌──────────────────┐          ┌──────────────────┐          ┌──────────────────┐
-│ Vision support   │          │ Text generation  │          │ Speech support   │
-│ Image reading    │          │ Simplification   │          │ Reading feedback │
-│ Text extraction  │          │ Explanations     │          │ Audio assistance │
+│ Image workflow   │          │ Reading workflow │          │ Speech workflow  │
+│ Text extraction  │          │ Simplification   │          │ Transcription    │
+│ Page reading     │          │ Syllable support │          │ Reading feedback │
 └────────┬─────────┘          └────────┬─────────┘          └────────┬─────────┘
          │                             │                             │
          └─────────────────────────────┼─────────────────────────────┘
                                        ▼
                          ┌──────────────────────────┐
                          │ Guided Reading Interface │
-                         │ Line / word support      │
-                         │ PT / EN interface        │
+                         │ Line / word / syllables  │
+                         │ PT / EN interaction      │
                          └──────────────────────────┘
 ```
 
-## Core idea
+## Architectural idea
 
-DyslexAI uses Gemma as the central intelligence layer of the application.
+DyslexAI treats Gemma as the central intelligence layer of the product rather than as a generic chatbot. The app gives the model narrow educational tasks through structured prompts, then presents the results inside a child-friendly reading interface.
 
-Instead of combining multiple external tools for OCR, summarisation, translation or speech-related support, the project explores how a single Gemma-based local runtime can support several accessibility tasks through well-designed prompts and a child-friendly interface.
+That lets the same local model support several connected jobs:
 
-## Why Gemma?
-
-Gemma is especially relevant to DyslexAI because it can support, out of the box, several capabilities that are important for accessible reading:
-
-- **Vision understanding** — analysing images of school materials and extracting relevant text.
-- **Text generation** — rewriting dense or complex text into simpler language.
-- **Multilingual interaction** — supporting Portuguese and English user interfaces and future multilingual reading experiences.
-- **Speech-related support** — enabling future reading feedback and oral reading assistance workflows.
-- **Prompt-driven task optimisation** — adapting the model behaviour to specific educational tasks through carefully designed instructions.
-
-This means the app is not built as a generic OCR tool. It is designed as a reading-assistance experience where Gemma is guided to perform educational and accessibility-oriented tasks.
-
-## Prompt design as part of the architecture
-
-Prompt engineering is an important architectural component of DyslexAI.
-
-The app uses structured prompts to guide Gemma towards specific behaviours, such as:
-
-- extracting only the useful text from a photographed page;
-- simplifying text without changing its educational meaning;
-- producing output suitable for children with dyslexia;
-- keeping responses clear, short and readable;
-- supporting guided reading modes;
-- preparing feedback that encourages autonomous reading.
-
-This approach improves both performance and task effectiveness because the model is not asked to behave like a general chatbot. It is given a precise educational role.
+- read visible text from a photographed page;
+- simplify dense text while preserving the educational meaning;
+- generate short reading exercises;
+- transcribe a child's reading attempt;
+- return feedback and syllabified text for guided practice.
 
 ## Main components
 
 ### Frontend
 
-The user interface is built with Vue and packaged for Android using Capacitor.
+The frontend is built with **Vue 3** and packaged for Android with **Capacitor**. It handles:
 
-The frontend is responsible for:
+- screen flow and navigation;
+- image capture or gallery selection;
+- guided reading views;
+- original, simplified, and spoken-text modes;
+- line-by-line, word-by-word, and syllable-assisted reading;
+- Portuguese / English interface switching;
+- model-download progress and first-launch setup.
 
-- screen flow;
-- image selection;
-- guided reading interface;
-- Portuguese / English language selection;
-- audio and reading interaction;
-- model download progress display;
-- accessible visual presentation for children with reading difficulties.
+### Native Android bridge
 
-### Android layer
+The Android layer connects the Capacitor UI to the local runtime. It is responsible for:
 
-The Android layer connects the Capacitor frontend with the local inference runtime.
+- checking whether the model already exists;
+- downloading the model on first launch when needed;
+- initializing the local engine;
+- forwarding image, text, and audio requests between the UI and native code;
+- reporting runtime state back to the app.
 
-It handles:
+### DyslexAIEngine
 
-- local model detection;
-- automatic model download;
-- progress reporting during model download;
-- model initialization;
-- communication between Vue and native Android code.
+`DyslexAIEngine` is the product-facing orchestration layer. It normalizes inputs and outputs for the frontend and defines the prompt contracts used for:
+
+- image extraction and simplification;
+- direct text simplification;
+- reading-phrase generation;
+- audio transcription;
+- reading feedback;
+- syllabified expected and spoken text.
 
 ### Local Gemma runtime
 
-The app uses a local Gemma 4 E4B LiteRT-LM model.
+`GemmaLocalRuntime` loads **Gemma 4 E4B LiteRT-LM** through LiteRT-LM and runs local text, image, and audio inference on the Android device.
 
-The model is downloaded on first launch and then used directly on the Android device.
+After the first model download, normal reading material can be processed on-device instead of being sent to a remote OCR or cloud inference service.
 
-This avoids sending children’s reading material to external OCR or cloud processing services during normal use after setup.
+## Prompt design
 
-### Kaggle experiments
+Prompt engineering is part of the architecture, not a cosmetic layer. The app constrains Gemma toward educational outputs such as:
 
-The `kaggle/` folder contains supporting experiments and demonstrations used during development.
+- extracting only the useful visible text from a photographed page;
+- rewriting content in clearer language;
+- keeping responses structured for the reader UI;
+- generating feedback that is usable for a child rather than merely descriptive;
+- producing syllable-separated forms that can be displayed in the interface.
 
-These experiments helped validate the use of Gemma for image understanding, text extraction, simplification and accessibility-oriented workflows.
-
-The final demo app is focused on Android/local execution.
+The syllable flow is already implemented, but it remains an area where output quality can still improve through prompt refinement and validation.
 
 ## Why local inference?
 
-Local inference helps with:
+Local inference helps the project pursue:
 
-- privacy;
-- reduced dependency on cloud services;
-- offline-first usage after model setup;
-- better control over the user experience;
-- suitability for educational accessibility scenarios;
-- demonstrating practical edge AI with Gemma.
+- greater privacy for children's reading material;
+- lower dependence on remote services after setup;
+- an offline-first usage model once the model is installed;
+- a coherent demonstration of edge AI with Gemma;
+- tighter control over latency, failure modes, and product experience.
 
-## Final hackathon focus
+## Development artifacts
 
-The final version prioritises:
+The `kaggle/` folder preserves notebook experiments and bridge prototypes used while exploring Gemma workflows during development. The current hackathon demo, however, is centered on the **Android local-inference path**.
 
-- a working Android demo;
-- real-device execution;
-- Gemma 4 local inference;
-- vision, text and speech-oriented accessibility workflows;
-- multilingual readiness;
-- dyslexia-focused reading support;
-- clear installation;
-- simple and accessible user experience.
+## Current scope
+
+The current build includes:
+
+- local image understanding;
+- local text simplification;
+- guided reading by line and word;
+- syllable-assisted presentation;
+- local speech-oriented reading practice;
+- Portuguese and English UI support;
+- first-launch model download and local initialization.
+
+The next engineering frontier is not adding these flows from zero, but making them more robust: faster inference, stronger syllable quality, cleaner outputs, and broader device testing.

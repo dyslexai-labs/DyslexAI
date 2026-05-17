@@ -2,79 +2,87 @@
 
 This guide explains how to install and run the DyslexAI Android demo.
 
+## What you need
+
+- a real Android device;
+- stable Wi-Fi for the first model download;
+- enough free storage for the local Gemma model;
+- preferably a modern mid-range or high-end device for smoother inference.
+
 ## 1. Install the APK
 
-Download the APK from the GitHub Release:
+Install:
 
-**DyslexAI-Hackathon-Demo-v1.0.apk**
-
-Install it on an Android device.
+```text
+release/apk/DyslexAI-Hackathon-Demo-v1.0.apk
+```
 
 If Android asks for permission to install apps from unknown sources, allow it for this installation.
 
-## 2. First launch
+## 2. Open the app for the first time
 
-Open DyslexAI.
+On first launch, DyslexAI checks whether the local Gemma model is already available.
 
-On the first launch, the app checks if the local Gemma model is already available.
+If the model is missing, the app opens a preparation screen and downloads it automatically.
 
-If the model is missing, the app automatically downloads it.
+## 3. Let the model download finish
 
-## 3. Model download
+The app downloads **Gemma 4 E4B LiteRT-LM** on first launch. The model is not bundled inside the APK and is not stored in the repository.
 
-The app downloads the following model:
+During setup, the app shows:
 
-**Gemma 4 E4B LiteRT-LM**
+- download percentage;
+- progress bar;
+- downloaded size versus total size;
+- a Wi-Fi recommendation.
 
-Source:
+Once the model is installed, the app initializes the local runtime and opens the normal DyslexAI interface.
 
-https://huggingface.co/litert-community/gemma-4-E4B-it-litert-lm
+## 4. Use the app locally
 
-The download screen shows:
+After setup, DyslexAI can run local inference for:
 
-- download percentage
-- progress bar
-- downloaded MB / total MB
-- Wi-Fi recommendation
+- image understanding;
+- visible-text extraction;
+- text simplification;
+- guided reading;
+- speech-oriented reading practice;
+- syllable-assisted display.
 
-The model is not included in the APK or in the GitHub repository.
+## 5. Development workflow
 
-## 4. Local execution
+For a local development build:
 
-After the model is installed, DyslexAI runs locally on the Android device.
+```bash
+cd frontend
+npm install
+npm run build
+npx cap sync android
+npx cap open android
+```
 
-The reading assistance flow uses local inference for:
+Then run the Android project on a real device.
 
-- image understanding
-- text extraction
-- text simplification
-- guided reading support
-
-## 5. Recommended device
-
-Recommended:
-
-- Android device
-- stable Wi-Fi for first model download
-- enough free storage for the model
-- modern mid-range or high-end device for better performance
-
-## 6. Troubleshooting
+## Troubleshooting
 
 ### The model download fails
 
 Check:
 
-- internet connection
-- available storage
-- Wi-Fi connection
+- internet connection;
+- available storage;
+- Wi-Fi stability.
 
-Then open the app and retry the download.
+Then reopen the app and retry the download.
 
-### The app is slow on first use
+### The first launch feels slow
 
-The first launch may take longer because the model needs to be downloaded and initialized.
+That is expected while the model is being downloaded and initialized for the first time.
 
-### The app does not start inference
+### Inference does not start after setup
 
 Close and reopen the app after the model download finishes.
+
+### The app runs slowly
+
+Inference speed depends on the Android device. A more capable device gives a smoother demo experience, especially for image and audio flows.

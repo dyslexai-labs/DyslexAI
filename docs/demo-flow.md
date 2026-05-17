@@ -1,125 +1,93 @@
 # DyslexAI — Demo Flow
 
-This document describes the recommended demo flow for the DyslexAI Android hackathon version.
+This is the recommended walkthrough for presenting the DyslexAI Android hackathon demo.
 
----
+## 1. Start at the home screen
 
-# 1. Home Screen
+The home screen introduces the two main paths:
 
-DyslexAI starts with a simple guided reading interface designed for accessibility and ease of use.
-
-The user can choose between:
-
-- assisted reading from an image
-- reading support using speech interaction
+- **assisted reading from an image**;
+- **reading practice from speech**.
 
 ![Home Screen](../screenshots/EN/1-home-EN.png)
 
----
+## 2. Choose a reading source
 
-# 2. Choose Image Source
+For the image path, the child can:
 
-The user can select how to provide the reading content.
+- take a photo;
+- choose an image from the gallery.
 
-Available options:
-
-- take a photo
-- choose an image from the gallery
-
-This allows the app to work with school books, worksheets and printed educational material.
+This keeps the demo close to real school use: textbook pages, worksheets, and printed exercises.
 
 ![Choose Image Source](../screenshots/EN/2-choose-image-source-EN.png)
 
----
+## 3. Confirm the image
 
-# 3. Confirm Image
-
-Before processing, the user confirms that the selected image is readable.
-
-This step helps ensure better local multimodal inference quality.
+Before inference starts, the app asks the user to confirm that the selected image is readable. This small step improves the quality of local multimodal processing and makes the flow feel deliberate rather than magical in a brittle way.
 
 ![Confirm Image](../screenshots/EN/3-confirm-image-EN.png)
 
----
+## 4. Show guided reading from the page
 
-# 4. Simplified Guided Reading
+Gemma processes the image locally to:
 
-Gemma 4 local inference is used to:
+- understand the page;
+- extract the visible text;
+- simplify the reading material;
+- prepare content for guided reading.
 
-- understand the image
-- extract the reading content
-- simplify the text
-- support guided reading
+The interface then supports:
 
-The guided reading interface supports:
-
-- simplified reading
-- syllable segmentation
-- line-by-line reading
-- word-by-word reading
-- adjustable speed
-- reading colors
-- audio playback
+- original and simplified text;
+- line-by-line reading;
+- word-by-word reading;
+- syllable-assisted display;
+- adjustable font size, speed, and reading colors;
+- audio playback.
 
 ![Simplified Guided Reading](../screenshots/EN/4-image-reading-simplified-EN.png)
 
----
+## 5. Move to speech-based practice
 
-# 5. Reading From Speech
+The speech path demonstrates that DyslexAI is not limited to photographed text. The child can:
 
-The application also supports speech-oriented reading interaction.
-
-The user can:
-
-- generate a phrase
-- read the phrase aloud
-- record speech
-- prepare guided reading exercises
-
-This demonstrates the multimodal and educational capabilities enabled by Gemma.
+- generate a reading phrase;
+- read it aloud;
+- record the attempt;
+- use the result as a guided reading exercise.
 
 ![Reading From Speech](../screenshots/EN/5-reading-from-speech-EN.png)
 
----
+## 6. Present the feedback result
 
-# 6. Speech Feedback Results
+After the recording is processed, the app can show:
 
-After speech processing, the app can compare:
+- the expected phrase;
+- the transcribed phrase;
+- syllabified reading support;
+- feedback prepared for the child;
+- audio playback of the relevant text.
 
-- expected phrase
-- transcribed phrase
-
-This supports reading practice and independent learning workflows.
-
-The interface also supports audio feedback playback.
+This closes the loop from passive reading support to active reading practice.
 
 ![Speech Feedback Results](../screenshots/EN/6-results-feedback-reading-EN.png)
 
----
+## What the demo proves
 
-# Multimodal Gemma Capabilities
+The walkthrough demonstrates that one local Gemma-based experience can connect:
 
-DyslexAI was designed to take advantage of multiple Gemma capabilities:
+- multimodal image understanding;
+- text simplification;
+- guided reading;
+- syllable support;
+- speech transcription;
+- reading feedback;
+- multilingual interaction;
+- privacy-friendly local inference.
 
-- multimodal image understanding
-- text generation
-- text simplification
-- multilingual support
-- speech-related interaction workflows
-- prompt-driven task adaptation
+## Suggested presenter framing
 
-The project demonstrates how prompt engineering and local inference can adapt Gemma to accessibility-focused educational scenarios.
+A concise framing for the demo is:
 
----
-
-# Final Hackathon Focus
-
-The final version focuses on:
-
-- Android local execution
-- accessibility
-- dyslexia-oriented reading support
-- multilingual UI
-- guided reading
-- multimodal AI interaction
-- privacy-friendly local inference
+> DyslexAI helps a child move from a photographed school page to a more accessible reading experience, and then from reading support into reading practice, all through one local Gemma-powered mobile app.

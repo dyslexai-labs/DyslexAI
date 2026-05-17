@@ -1,202 +1,145 @@
 # DyslexAI
 
-**DyslexAI** is an assistive reading application for children with dyslexia, created for the **Kaggle Gemma 4 Good Hackathon**.
+**DyslexAI** is an Android assistive-reading app for children with dyslexia, built for the **Kaggle Gemma 4 Good Hackathon**.
 
-Our goal is to make reading more accessible, less frustrating, and more autonomous for children who struggle with dyslexia. DyslexAI combines **multimodal AI**, **text simplification**, and **guided reading support** to transform textbook pages into clearer, more readable learning experiences.
-
----
-
-## Why this matters
-
-Many children with dyslexia face barriers that go beyond decoding words. They often struggle with:
-
-- dense or visually overwhelming text
-- long sentences and complex structures
-- reduced reading fluency
-- low confidence when reading independently
-- difficulty following the reading flow line by line or word by word
-
-DyslexAI was designed to address these challenges with an experience that feels like a real educational product, not just a technical prototype.
+It turns a photographed school page into a calmer reading experience: Gemma extracts the text, rewrites it in clearer language, and the app guides the child through it line by line or word by word. The project is designed around one practical question: **how can multimodal AI reduce the friction between a child and the page in front of them?**
 
 ---
 
-## What DyslexAI does
+## What the app does
 
-DyslexAI is built to support reading in a practical school context.
+From a single mobile flow, a student can:
 
-A student can:
+1. take a photo or choose an image of a worksheet, textbook page, or printed material;
+2. extract the visible text with local multimodal inference;
+3. receive a simplified version in clearer European Portuguese or English;
+4. read with support through:
+   - original and simplified text views;
+   - line-by-line reading;
+   - word-by-word reading;
+   - adjustable text size, reading speed, and color palette;
+   - audio playback;
+5. practise reading aloud through a speech flow that can generate a phrase, record the child, transcribe the attempt, and return guided feedback.
 
-1. **Load an image** of a textbook page or worksheet
-2. **Extract visible text** from the page using a Gemma-family multimodal model
-3. **Simplify the text** into clearer European Portuguese
-4. **Read with guidance**, using:
-   - original text
-   - simplified text
-   - line-by-line reading
-   - word-by-word reading
-5. *(In development)* **Read aloud and be accompanied by the app**
+### Current mobile capabilities
 
-The current mobile flow returns structured data ready for the reader interface:
+| Capability | Status |
+| --- | --- |
+| Text simplification | Working |
+| Image understanding and text extraction | Working |
+| Guided reading interface | Working |
+| Local audio transcription / reading feedback | Working |
+| Syllable segmentation | Implemented; needs further refinement |
 
-- `original_text`
-- `simplified_text`
-- `original_lines`
-- `simplified_lines`
+The mobile runtime currently exposes:
 
----
-
-## Hackathon focus
-
-This project was developed in the context of the **Gemma 4 Good Hackathon**, with a clear social impact goal:
-
-- **inclusive education**
-- **reading accessibility**
-- **AI applied to a real problem**
-- **child-centered experience**
-- **practical mobile demo**
-
-Rather than building a generic chatbot or OCR utility, DyslexAI focuses on a specific educational challenge: helping children with dyslexia read more effectively and more independently.
+```text
+text: true
+image: true
+audio: true
+syllables: true
+```
 
 ---
 
-## Current architecture
+## Why it matters
 
-DyslexAI currently includes two complementary paths in the repository:
+For many children with dyslexia, the obstacle is not only the words themselves. Dense layouts, long sentences, reduced reading fluency, and the effort of tracking text can turn ordinary school material into a wall.
 
-### 1. Original web / backend path
+DyslexAI is not intended to be just OCR, a chatbot, or text-to-speech stitched together. It is a **guided reading experience** built around accessibility, autonomy, and educational usefulness.
 
-The repository still contains the original project structure:
+---
 
-- `frontend/` — Vue 3 + Vite interface
-- `backend/` — Flask API and processing providers
-- `kaggle/` — Kaggle notebook and bridge experiments with Gemma 4
+## Demo flow
 
-### 2. Mobile local inference path
+| Home | Image selection | Guided reading |
+| --- | --- | --- |
+| ![Home screen](screenshots/EN/1-home-EN.png) | ![Choose image source](screenshots/EN/2-choose-image-source-EN.png) | ![Simplified guided reading](screenshots/EN/4-image-reading-simplified-EN.png) |
 
-The Android app is built with **Capacitor** and includes a local inference runtime using **LiteRT-LM**.
+| Speech practice | Reading feedback |
+| --- | --- |
+| ![Reading from speech](screenshots/EN/5-reading-from-speech-EN.png) | ![Speech feedback results](screenshots/EN/6-results-feedback-reading-EN.png) |
 
-Current mobile architecture:
+For the full walkthrough, see [`docs/demo-flow.md`](docs/demo-flow.md).
+
+---
+
+## How Gemma is used
+
+DyslexAI uses **Gemma 4 E4B LiteRT-LM** as the app's local multimodal engine. Prompted for narrow educational tasks, the same model supports:
+
+- image understanding and visible-text extraction;
+- text simplification for younger readers;
+- short phrase generation for reading exercises;
+- audio transcription and reading-feedback workflows;
+- multilingual interaction in Portuguese and English.
+
+The architecture deliberately keeps Gemma close to the user: after the first model download, inference runs on-device rather than sending a child's reading material to a remote service.
 
 ```text
 Android app
-→ Vue interface
-→ Capacitor plugin
-→ DyslexAIEngine
-→ GemmaLocalRuntime
-→ LiteRT-LM local engine
-→ local model on device
+  -> Vue + Capacitor interface
+  -> native Capacitor bridge
+  -> DyslexAIEngine
+  -> GemmaLocalRuntime
+  -> LiteRT-LM local engine
+  -> local Gemma model on device
 ```
 
-This mobile path is now a core part of the implementation.
+A fuller explanation is available in [`docs/architecture.md`](docs/architecture.md).
 
 ---
 
-## Current mobile capabilities
+## Installation
 
-The current Android mobile runtime supports:
+### Fastest route: install the Android demo
 
-- local model initialization
-- local text simplification
-- local image-based text extraction
-- structured output for guided reading
+1. Install `release/apk/DyslexAI-Hackathon-Demo-v1.0.apk` on a real Android device.
+2. Open the app.
+3. On first launch, the app downloads the Gemma model if it is not already present.
+4. After setup, use the app locally on-device.
 
-Current capability flags:
-
-- `text: true`
-- `image: true`
-- `audio: false`
-- `syllables: false`
-
-Audio support is planned, but not yet implemented in the current mobile runtime.
-
----
-
-## Current prompting approach
-
-The mobile runtime currently uses prompts for:
-
-- extracting only the visible text from an image
-- simplifying text into clearer European Portuguese
-- returning only the requested output
-- keeping the experience focused and predictable
-
-Prompting is still being refined to improve:
-
-- latency
-- output cleanliness
-- readability for dyslexic students
-- consistency in European Portuguese
-
----
-
-## Android local runtime
-
-The mobile runtime expects the local model file to be present on the Android device at:
+The model is **not bundled inside the APK**. On first launch, the app downloads:
 
 ```text
-/data/local/tmp/llm/gemma/model.litertlm
+gemma-4-E4B-it.litertlm
 ```
 
-The app now manages this file automatically on first launch. The bundled APK does **not** include the model. Instead, the Android app:
+from the LiteRT community model repository on Hugging Face.
 
-1. checks whether `/data/local/tmp/llm/gemma/model.litertlm` already exists
-2. shows a preparation screen if the model is missing
-3. downloads the Gemma 4 E4B LiteRT-LM file, `gemma-4-E4B-it.litertlm`, from Hugging Face
-4. stores it locally as `model.litertlm`
-5. initializes the existing `GemmaLocalRuntime`
-6. enters the normal DyslexAI interface
+For device notes and troubleshooting, see [`docs/install-guide.md`](docs/install-guide.md).
 
-After this setup, processing is fully local/on-device.
-
-For compatibility with older debug installs, the runtime still uses `/data/local/tmp/llm/gemma/model.litertlm` when that file already exists and is valid. On normal Android installs, where apps cannot create folders under `/data/local/tmp`, the automatic download is stored in the app-private files directory instead.
-
-Model source:
-
-```text
-https://huggingface.co/litert-community/gemma-4-E4B-it-litert-lm/resolve/main/gemma-4-E4B-it.litertlm
-```
-
-Typical development flow:
+### Development build
 
 ```bash
+cd frontend
+npm install
 npm run build
 npx cap sync android
 npx cap open android
 ```
 
-Then the app is run on a real Android device.
+Then run the project on a real Android device.
 
 ---
 
-## Frontend environment and mock mode
+## Frontend configuration
 
-The Vue frontend uses **Vite** environment variables. Only variables whose name starts with `VITE_` are exposed to the app.
-
-Important: these variables are read by Vite at **development/build time**. In the Android app they are bundled into the generated web assets. That means the Android app does **not** read `.env` dynamically at runtime after it has already been compiled.
-
-Create a frontend environment file from the example:
+The Vue frontend uses Vite variables. Create `frontend/.env` when needed:
 
 ```bash
 cd frontend
-cp .env.example .env
+touch .env
 ```
 
-Available variables:
+Useful variables:
 
 ```env
 VITE_DYSLEXAI_MOCK=false
 VITE_IMAGE_INFERENCE_TIMEOUT_MS=900000
 ```
 
-### Real inference mode
-
-Use real web/native inference by keeping mock mode disabled:
-
-```env
-VITE_DYSLEXAI_MOCK=false
-```
-
-Then rebuild and sync Android:
+`VITE_*` values are read at build time. If you change them for Android, rebuild and resync:
 
 ```bash
 cd frontend
@@ -204,160 +147,59 @@ npm run build
 npx cap sync android
 ```
 
-### Mock inference mode
-
-Use mock mode to develop and test the interface without waiting for the local model:
+Use mock mode only for interface development:
 
 ```env
 VITE_DYSLEXAI_MOCK=true
 ```
 
-Then rebuild and sync Android:
-
-```bash
-cd frontend
-npm run build
-npx cap sync android
-```
-
-For a one-off web build without editing `.env`:
-
-```bash
-cd frontend
-VITE_DYSLEXAI_MOCK=true npm run build
-```
-
-For local browser development:
-
-```bash
-cd frontend
-VITE_DYSLEXAI_MOCK=true npm run dev
-```
-
-The mock provider simulates:
-
-- image processing
-- phrase generation
-- audio transcription
-- text-to-speech calls
-- native WAV recording calls
-
-This is intended only for interface development and fast testing.
-
-### Timeout configuration
-
-Image inference timeout is configured with:
-
-```env
-VITE_IMAGE_INFERENCE_TIMEOUT_MS=900000
-```
-
-`900000` milliseconds is 15 minutes. Because this is also a Vite variable, changing it for Android requires:
-
-```bash
-cd frontend
-npm run build
-npx cap sync android
-```
-
 ---
 
-## Current status
-
-### Working now
-
-- Android local runtime initialization
-- local text simplification
-- local image extraction path
-- guided reading data generation
-- original/simplified reading modes
-- line and word reading support
-
-### In progress
-
-- prompt tuning
-- latency reduction on lower-end Android tablets
-- better multimodal model support on-device
-- stronger demo robustness
-
-### Planned next
-
-- child voice capture
-- transcription of the child’s reading
-- detection of common reading difficulties such as:
-  - letter swaps
-  - syllable swaps
-  - missing or incorrect accentuation
-  - other reading patterns relevant to dyslexia support
-
----
-
-## Why DyslexAI is different
-
-DyslexAI is **not** just:
-
-- an OCR app
-- a generic chatbot
-- a simple text-to-speech interface
-
-It is designed as a **guided reading experience** for children with dyslexia.
-
-The aim is not only to extract text, but to make reading:
-
-- clearer
-- more manageable
-- more adaptive
-- more autonomous
-
----
-
-## Roadmap
-
-Short term:
-
-- improve mobile latency
-- refine prompts for better extraction and simplification
-- improve visual polish for demo quality
-- strengthen fallback behavior for reliable live demonstrations
-
-Mid term:
-
-- integrate child voice reading support
-- compare spoken reading against displayed text
-- identify common dyslexia-related reading patterns
-- evolve into a stronger educational support product
-
----
-
-## Repository structure
+## Repository map
 
 ```text
 DyslexAI/
-├── backend/
-├── frontend/
-│   ├── src/
-│   └── android/
-├── kaggle/
+├── docs/          # architecture, demo flow, installation guide
+├── frontend/      # Vue app, Capacitor Android project, local runtime bridge
+├── kaggle/        # Gemma experiments and notebook bridges used during development
+├── release/apk/   # installable Android demo build
+├── screenshots/   # PT and EN product screenshots
 └── README.md
 ```
+
+The repository still preserves Kaggle notebook experiments from the development phase, while the current hackathon demo is centered on the Android local-inference path.
+
+---
+
+## Project status
+
+### Working now
+
+- Android model setup and runtime initialization;
+- local text simplification;
+- local image-based text extraction;
+- local speech-oriented reading flow;
+- guided reading with original/simplified modes;
+- Portuguese and English interface support.
+
+### Next improvements
+
+- improved syllable segmentation quality;
+- faster inference on weaker Android devices;
+- stronger prompt consistency and output cleanup;
+- richer dyslexia-oriented feedback patterns;
+- broader testing across educational materials and devices.
+
+---
+
+## Documentation
+
+- [`docs/architecture.md`](docs/architecture.md) — system design and Gemma role
+- [`docs/demo-flow.md`](docs/demo-flow.md) — recommended hackathon walkthrough
+- [`docs/install-guide.md`](docs/install-guide.md) — Android installation steps
 
 ---
 
 ## Vision
 
-DyslexAI is being built not only as a hackathon project, but as the foundation for a real educational tool.
-
-The long-term vision is to support children with dyslexia through:
-
-- accessible reading workflows
-- AI-assisted simplification
-- guided reading support
-- reading fluency development
-- inclusive educational technology
-
----
-
-## About
-
-**DyslexAI**  
-Assistive reading app for dyslexic students using AI.
+DyslexAI is a hackathon project, but it is aimed at a real educational horizon: reading support that is private, practical, and humane enough for children to use without feeling that technology has taken over the room.
