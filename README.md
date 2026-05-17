@@ -6,8 +6,7 @@ Built for the **Kaggle Gemma 4 Good Hackathon**, the final submission is centere
 
 ## Demo video
 
-Watch the public demo:  
-<https://www.youtube.com/watch?v=iGtbTc_InLY>
+[![Watch the demo](docs/images/youtube-preview.png)](https://www.youtube.com/watch?v=iGtbTc_InLY)
 
 ## Why it matters
 
