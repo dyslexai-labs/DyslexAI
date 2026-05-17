@@ -161,13 +161,11 @@ VITE_DYSLEXAI_MOCK=true
 DyslexAI/
 ├── docs/          # architecture, demo flow, installation guide
 ├── frontend/      # Vue app, Capacitor Android project, local runtime bridge
-├── kaggle/        # Gemma experiments and notebook bridges used during development
 ├── release/apk/   # installable Android demo build
 ├── screenshots/   # PT and EN product screenshots
 └── README.md
 ```
 
-The repository still preserves Kaggle notebook experiments from the development phase, while the current hackathon demo is centered on the Android local-inference path.
 
 ---
 

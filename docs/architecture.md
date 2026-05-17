@@ -126,10 +126,6 @@ Local inference helps the project pursue:
 - a coherent demonstration of edge AI with Gemma;
 - tighter control over latency, failure modes, and product experience.
 
-## Development artifacts
-
-The `kaggle/` folder preserves notebook experiments and bridge prototypes used while exploring Gemma workflows during development. The current hackathon demo, however, is centered on the **Android local-inference path**.
-
 ## Current scope
 
 The current build includes:
